@@ -1,3 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="Slot: test. A stack fills this slot. It is empty in the seed."
-echo "check:test: the slot is empty. No tool is configured." >&2
+#MISE description="Tests: pytest for the backend."
+set -euo pipefail
+# shellcheck source=.mise/lib/stack.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
+
+if has_backend; then
+  (cd "$stack_target/backend" && py pytest -q -p no:cacheprovider)
+fi

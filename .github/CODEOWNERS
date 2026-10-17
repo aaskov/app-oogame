@@ -21,3 +21,10 @@
 /contracts/         @aaskov
 /docs/adr/          @aaskov
 /tests/guardrails/  @aaskov
+
+# Backend stack (docs/adr/0100): the dependencies, the checker configs, and the agent guide.
+/backend/pyproject.toml   @aaskov
+/backend/uv.lock          @aaskov
+/backend/.python-version  @aaskov
+/backend/AGENTS.md        @aaskov
+/backend/CLAUDE.md        @aaskov

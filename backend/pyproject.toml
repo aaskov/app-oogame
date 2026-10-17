@@ -1,0 +1,67 @@
+# Guarded (CODEOWNERS): the dependencies and the checker configs.
+# An agent proposes a change here with the needs-decision label.
+
+[project]
+name = "app-oogame-backend"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+]
+
+[dependency-groups]
+dev = [
+  "basedpyright",
+  "httpx2",
+  "import-linter",
+  "pytest",
+  "pyyaml",
+  "ruff",
+]
+
+[tool.uv]
+package = false
+
+# --- check:lint ---------------------------------------------------------------
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "PGH", "RUF"]
+# PGH004 forbids a bare "# noqa". RUF100 forbids an unused "# noqa".
+
+# --- check:types --------------------------------------------------------------
+[tool.basedpyright]
+typeCheckingMode = "standard"
+pythonVersion = "3.13"
+include = ["app", "tests"]
+enableTypeIgnoreComments = false
+reportIgnoreCommentWithoutRule = true
+
+# --- check:test ---------------------------------------------------------------
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+filterwarnings = ["error"]
+
+# --- check:boundaries (docs/adr/0101) -----------------------------------------
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "Modules are independent. They meet only through public_api."
+type = "independence"
+modules = ["app.modules.*"]
+ignore_imports = ["app.modules.** -> app.modules.*.public_api"]
+# The rule is for future modules. Today no module imports another one.
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
+name = "Layers in each module: router -> service -> repository -> schemas | models"
+type = "layers"
+containers = ["app.modules.*._internal"]
+# Each layer is optional: the contract sets the direction, not the presence.
+layers = ["(router)", "(service)", "(repository)", "(schemas) | (models)"]
+exhaustive = false

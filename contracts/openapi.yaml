@@ -1,0 +1,25 @@
+openapi: 3.1.0
+info:
+  title: app-oogame
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      operationId: read_health
+      summary: Report that the backend runs.
+      responses:
+        "200":
+          description: The backend runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
