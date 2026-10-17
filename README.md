@@ -4,7 +4,7 @@ Ogame clone
 
 Agents write the code and machines check it. The architect reviews only
 contracts and decisions. This repository comes from
-[agentic-seed](/private/var/folders/9p/1bj8950n47qc7b6x9f8s79b80000gp/T/copier._vcs.clone.m29tkl5r).
+[agentic-seed](https://github.com/aaskov/agentic-seed).
 
 ## Start
 

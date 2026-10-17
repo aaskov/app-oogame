@@ -3,6 +3,10 @@
 # and passes when it must. If a guardrail stops working, this test fails.
 set -uo pipefail
 
+# The cases set their own overrides. Overrides from the caller, such as CI,
+# must not leak into the cases.
+unset SEED_ROOT SEED_BRANCH SEED_BASE_REF SEED_GATE_CMD SEED_AGENTS_FILE SEED_AGENTS_MAX_LINES
+
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 checks="$repo/.mise/tasks/check"
 hooks="$repo/.claude/hooks"
