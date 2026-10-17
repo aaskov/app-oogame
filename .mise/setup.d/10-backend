@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Install the backend packages exactly as in uv.lock (docs/adr/0100).
+set -euo pipefail
+uv sync --project backend --locked

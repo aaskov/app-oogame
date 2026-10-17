@@ -2,6 +2,8 @@
 # A stack adds its tools under [tools] and fills the check slots in .mise/tasks/check/.
 
 [tools]
+uv = "0.13.1"
+node = "24.22.0"
 
 [tasks.check]
 description = "Run the gate. It must pass before a merge."

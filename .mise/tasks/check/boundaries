@@ -1,3 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="Slot: boundaries. A stack fills this slot. It is empty in the seed."
-echo "check:boundaries: the slot is empty. No tool is configured." >&2
+#MISE description="Boundaries: import-linter for the backend modules (docs/adr/0101)."
+set -euo pipefail
+# shellcheck source=.mise/lib/stack.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
+
+if has_backend; then
+  (cd "$stack_target/backend" && PYTHONPATH=. py lint-imports --no-cache)
+fi
