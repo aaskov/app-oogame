@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Install the git hooks. Run it once for each clone."
+set -euo pipefail
+git config core.hooksPath .githooks
+echo "setup: git hooks installed from .githooks/."

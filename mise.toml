@@ -1,0 +1,8 @@
+# Tools and tasks for this repository.
+# A stack adds its tools under [tools] and fills the check slots in .mise/tasks/check/.
+
+[tools]
+
+[tasks.check]
+description = "Run the gate. It must pass before a merge."
+depends = ["check:*"]

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="Slot: boundaries. A stack fills this slot. It is empty in the seed."
+echo "check:boundaries: the slot is empty. No tool is configured." >&2

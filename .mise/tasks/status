@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#MISE description="Show the project state. It is derived from git and GitHub."
+set -euo pipefail
+# shellcheck source=.mise/lib/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+
+cd "$(seed_root)"
+base="$(seed_base_ref)"
+none() { grep . || echo "  (none)"; }
+
+echo "== Branch"
+branch="$(seed_branch)"
+echo "  ${branch:-(detached)}"
+if git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+  read -r behind ahead < <(git rev-list --left-right --count "$base...HEAD")
+  echo "  $ahead ahead and $behind behind $base"
+fi
+
+echo "== Uncommitted changes"
+git status --short | sed -n '1,20s/^/  /p' | none
+
+echo "== Worktrees"
+git worktree list | sed 's/^/  /'
+
+if git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+  echo "== Branches not merged into $base"
+  git branch --no-merged "$base" --format='  %(refname:short)' | none
+fi
+
+if command -v gh >/dev/null && gh auth status >/dev/null 2>&1 && git remote get-url origin >/dev/null 2>&1; then
+  echo "== Needs decision"
+  gh issue list --label needs-decision --limit 20 | sed 's/^/  /' | none
+  echo "== Open pull requests"
+  gh pr list --limit 20 | sed 's/^/  /' | none
+  echo "== Open issues"
+  gh issue list --limit 20 | sed 's/^/  /' | none
+  echo "== CI on $base"
+  gh run list --branch "$base" --limit 3 | sed 's/^/  /' | none
+else
+  echo "== GitHub"
+  echo "  Not connected. Add an origin remote and run 'gh auth login' to see issues, PRs, and CI."
+fi

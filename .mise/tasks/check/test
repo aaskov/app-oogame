@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="Slot: test. A stack fills this slot. It is empty in the seed."
+echo "check:test: the slot is empty. No tool is configured." >&2

@@ -1,0 +1,29 @@
+name: Task
+description: One task for one agent. One issue, one branch, one PR.
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What must be true when the task is done?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: One item for each line. Each item must be testable.
+      placeholder: "- [ ] GET /health returns 200"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: The paths that the agent can change.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope

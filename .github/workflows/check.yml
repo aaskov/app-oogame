@@ -1,0 +1,24 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # The gate runs in the same devcontainer as the agents.
+      - uses: devcontainers/ci@v0.3
+        env:
+          SEED_BRANCH: ${{ github.head_ref || github.ref_name }}
+          SEED_BASE_REF: origin/${{ github.base_ref || 'main' }}
+        with:
+          runCmd: mise run check
+          env: |
+            SEED_BRANCH
+            SEED_BASE_REF

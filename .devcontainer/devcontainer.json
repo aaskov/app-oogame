@@ -1,0 +1,10 @@
+{
+  "name": "${localWorkspaceFolderBasename}",
+  "build": { "dockerfile": "Dockerfile" },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  "remoteUser": "vscode",
+  "postCreateCommand": ".devcontainer/post-create.sh"
+}

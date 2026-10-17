@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#MISE description="Each rule in AGENTS.md names a check that exists. AGENTS.md stays short."
+set -euo pipefail
+# shellcheck source=.mise/lib/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"
+
+agents="${SEED_AGENTS_FILE:-$(seed_root)/AGENTS.md}"
+max_lines="${SEED_AGENTS_MAX_LINES:-60}"
+status=0
+
+lines=$(wc -l <"$agents" | tr -d ' ')
+if (( lines > max_lines )); then
+  echo "check:rules: AGENTS.md has $lines lines. The maximum is $max_lines." >&2
+  status=1
+fi
+
+tasks="$(mise tasks ls --json | jq -r '.[].name')"
+
+# A rule row looks like: | R1 | Rule text. | `check:name` |
+rules="$(awk -F'|' '/^\| *R[0-9]+ *\|/ {
+  id = $2; check = $(NF-1)
+  gsub(/[ `]/, "", id); gsub(/[ `]/, "", check)
+  print id, check
+}' "$agents")"
+
+if [ -z "$rules" ]; then
+  echo "check:rules: AGENTS.md has no rule rows. Use the format: | R1 | Rule. | \`check:name\` |" >&2
+  exit 1
+fi
+
+while read -r id check; do
+  if ! grep -qxF "$check" <<<"$tasks"; then
+    echo "check:rules: rule $id names the check '$check'. No mise task has that name." >&2
+    status=1
+  fi
+done <<<"$rules"
+
+exit "$status"

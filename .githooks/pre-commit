@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# The gate runs before each commit. Install with: mise run setup
+exec mise run check

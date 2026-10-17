@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Each guardrail fails on its seeded violation."
+set -euo pipefail
+exec "$(git rev-parse --show-toplevel)/tests/guardrails/test_guardrails.sh"

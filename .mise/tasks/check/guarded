@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#MISE description="An agent branch does not change a guarded path (.github/CODEOWNERS)."
+set -euo pipefail
+# shellcheck source=.mise/lib/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"
+
+root="$(seed_root)"
+branch="$(seed_branch)"
+base="$(seed_base_ref)"
+
+# Only agent branches are restricted. check:branch restricts the branch names.
+if [[ "$branch" != agent/* ]]; then
+  exit 0
+fi
+
+if ! git -C "$root" rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+  echo "check:guarded: the base ref '$base' does not exist. The check is skipped." >&2
+  exit 0
+fi
+
+merge_base="$(git -C "$root" merge-base "$base" HEAD)"
+
+# Committed, staged, unstaged, and untracked changes since the branch point.
+changed="$({
+  git -C "$root" diff --name-only "$merge_base"
+  git -C "$root" ls-files --others --exclude-standard
+} | sort -u)"
+
+status=0
+while IFS= read -r path; do
+  [ -n "$path" ] || continue
+  if is_guarded "$path"; then
+    echo "check:guarded: '$path' is a guarded path. Agent branches must not change it." >&2
+    status=1
+  fi
+done <<<"$changed"
+
+if (( status != 0 )); then
+  echo "check:guarded: revert these changes. Then follow 'When you are blocked' in AGENTS.md." >&2
+fi
+exit "$status"

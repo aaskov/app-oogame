@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#MISE description="The branch name is main, agent/<issue>-<slug>, or architect/<slug>."
+set -euo pipefail
+# shellcheck source=.mise/lib/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../lib/common.sh"
+
+branch="$(seed_branch)"
+
+if [ -z "$branch" ]; then
+  echo "check:branch: no branch (detached HEAD). The check is skipped." >&2
+  exit 0
+fi
+
+if [[ "$branch" =~ ^(main|agent/[0-9]+-[a-z0-9-]+|architect/[a-z0-9-]+)$ ]]; then
+  exit 0
+fi
+
+echo "check:branch: '$branch' is not a valid branch name." >&2
+echo "check:branch: use agent/<issue>-<slug>, for example agent/12-add-login." >&2
+exit 1
