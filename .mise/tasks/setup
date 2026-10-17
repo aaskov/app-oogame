@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Install the git hooks. Run it once for each clone."
+#MISE description="Install the git hooks and run each stack setup script. Run it once for each clone."
 set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
 git config core.hooksPath .githooks
 echo "setup: git hooks installed from .githooks/."
+# A stack adds its own executable script to .mise/setup.d/, for example to run
+# 'uv sync' or 'npm ci'. It does not edit this file.
+for script in .mise/setup.d/*; do
+  [ -x "$script" ] || continue
+  echo "setup: running $script"
+  "$script"
+done

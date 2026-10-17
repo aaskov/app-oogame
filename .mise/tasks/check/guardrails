@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="Each guardrail fails on its seeded violation."
+#MISE description="Each guardrail fails on its seeded violation (tests/guardrails/test_*.sh)."
 set -euo pipefail
-exec "$(git rev-parse --show-toplevel)/tests/guardrails/test_guardrails.sh"
+# A stack adds its own test_*.sh file. It does not edit test_guardrails.sh.
+status=0
+for test in "$(git rev-parse --show-toplevel)"/tests/guardrails/test_*.sh; do
+  "$test" || status=1
+done
+exit "$status"
