@@ -5,3 +5,4 @@ git config --global --add safe.directory "$PWD"
 mise trust --yes
 mise install
 mise run setup
+.devcontainer/agent-bot/setup.sh

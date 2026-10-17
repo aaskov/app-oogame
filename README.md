@@ -23,6 +23,17 @@ contracts and decisions. This repository comes from
 | Guarded paths | `.github/CODEOWNERS` |
 | Guardrail tests | `tests/guardrails/` |
 
+## Agent identity
+
+Agents act as a GitHub App, not as you (docs/adr/0005). To turn it on:
+
+1. Create a GitHub App with write access to contents, pull requests, and issues.
+2. Install it on this repository only.
+3. Put its private key at `~/.config/agent-bot/private-key.pem` on the host.
+4. Set the app ID and name in `.devcontainer/agent-bot.env`.
+
+Then rebuild the devcontainer.
+
 ## Add a stack
 
 The gate has five empty slots in `.mise/tasks/check/`: `lint`, `types`,
