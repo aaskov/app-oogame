@@ -41,13 +41,15 @@ gitc add . && gitc commit -q -m init
 
 # --- guard-paths hook ---------------------------------------------------------
 
+# The hook depends on the branch. The cases pin it, so the result does not
+# depend on the branch that runs the gate.
 guard() {
   printf '{"tool_name":"Edit","tool_input":{"file_path":"%s"}}' "$1" |
-    SEED_ROOT="$repo" "$hooks/guard-paths.sh"
+    SEED_ROOT="$repo" SEED_BRANCH="${2:-agent/1-feature}" "$hooks/guard-paths.sh"
 }
 guard_notebook() {
   printf '{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"%s"}}' "$1" |
-    SEED_ROOT="$repo" "$hooks/guard-paths.sh"
+    SEED_ROOT="$repo" SEED_BRANCH=agent/1-feature "$hooks/guard-paths.sh"
 }
 
 expect 2 "hook blocks an edit in contracts/" guard "$repo/contracts/api.yaml"
@@ -55,6 +57,9 @@ expect 2 "hook blocks an edit to CLAUDE.md" guard "$repo/CLAUDE.md"
 expect 2 "hook blocks an edit to a check" guard "$repo/.mise/tasks/check/lint"
 expect 2 "hook blocks a relative guarded path" guard "mise.toml"
 expect 2 "hook blocks a notebook in docs/adr/" guard_notebook "$repo/docs/adr/x.ipynb"
+expect 2 "hook blocks a guarded edit on main" guard "$repo/mise.toml" main
+expect 2 "hook blocks a guarded edit on a detached HEAD" guard "$repo/mise.toml" ""
+expect 0 "hook allows a guarded edit on an architect branch" guard "$repo/mise.toml" architect/stack
 expect 0 "hook allows an edit in src/" guard "$repo/src/app.py"
 expect 0 "hook allows docs outside docs/adr/" guard "$repo/docs/notes.md"
 expect 0 "hook allows a path outside the repo" guard "/tmp/other/mise.toml"
