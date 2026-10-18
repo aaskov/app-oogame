@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Contracts: the backend serves exactly the operations in contracts/openapi.yaml."
+#MISE description="Contracts: the backend serves exactly the contract operations. frontend/src/types/api.ts matches the contract."
 set -euo pipefail
 # shellcheck source=.mise/lib/stack.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
@@ -7,4 +7,15 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
 if has_backend; then
   py python "$stack_tools/.mise/lib/contract_check.py" \
     "$stack_target/contracts/openapi.yaml" "$stack_target/backend"
+fi
+
+# The frontend types must be a fresh generation from the contract.
+if has_frontend; then
+  fresh_types="$(mktemp -d)/api.ts"
+  node_tool openapi-typescript "$stack_target/contracts/openapi.yaml" -o "$fresh_types" --silent
+  if ! diff -u "$stack_target/frontend/src/types/api.ts" "$fresh_types"; then
+    echo "check:contracts: frontend/src/types/api.ts does not match contracts/openapi.yaml." >&2
+    echo "check:contracts: the architect runs 'npm run types:api' in frontend/." >&2
+    exit 1
+  fi
 fi

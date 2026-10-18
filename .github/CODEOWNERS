@@ -28,3 +28,16 @@
 /backend/.python-version  @aaskov
 /backend/AGENTS.md        @aaskov
 /backend/CLAUDE.md        @aaskov
+
+# Frontend stack (docs/adr/0102): the dependencies, the tool configs, shared code, and the agent guide.
+/frontend/package.json            @aaskov
+/frontend/package-lock.json       @aaskov
+/frontend/tsconfig.json           @aaskov
+/frontend/next.config.ts          @aaskov
+/frontend/eslint.config.mjs       @aaskov
+/frontend/vitest.config.ts        @aaskov
+/frontend/.dependency-cruiser.cjs @aaskov
+/frontend/src/lib/                @aaskov
+/frontend/src/types/              @aaskov
+/frontend/AGENTS.md               @aaskov
+/frontend/CLAUDE.md               @aaskov
