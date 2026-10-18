@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Bring the database schema to the latest Alembic migration (docs/adr/0104).
+# Only the architect writes migrations. Each container applies them here.
+set -euo pipefail
+cd backend
+uv run --locked alembic upgrade head

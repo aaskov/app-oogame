@@ -24,6 +24,19 @@ src/lib/                    ← shared code, for example the API client. Archite
 src/types/api.ts            ← generated from contracts/openapi.yaml. Do not edit.
 ```
 
+## Calling the backend
+
+Use the typed client in `src/lib/api.ts`. Its types come from the contract:
+
+```ts
+import { api } from "@/lib/api";
+const { data, error, response } = await api.POST("/auth/login", { body: { email, password } });
+```
+
+The backend keeps the session in an httpOnly cookie. The client sends it with
+each request. Never store a token in JavaScript. In a test, pass a fake fetch
+to `createApi(fakeFetch)`.
+
 A feature folder in `components/` does not import another feature folder.
 `lib/` and `types/` do not import UI code. There are no circular imports.
 

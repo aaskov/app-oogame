@@ -1,8 +1,19 @@
-from app.shared.db import connect
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.shared.orm import UserRow
 
 
-def test_database_answers() -> None:
-    with connect() as connection:
-        row = connection.execute("select 1").fetchone()
+def test_database_answers(session: Session) -> None:
+    assert session.execute(text("select 1")).scalar_one() == 1
 
-    assert row == (1,)
+
+def test_users_table_exists(session: Session) -> None:
+    session.add(UserRow(email="fixture@example.com", password_hash="x"))
+    session.flush()
+
+    assert session.query(UserRow).filter_by(email="fixture@example.com").count() == 1
+
+
+def test_the_rollback_removed_the_user(session: Session) -> None:
+    assert session.query(UserRow).filter_by(email="fixture@example.com").count() == 0

@@ -1,7 +1,12 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.1.0
+  version: 0.2.0
+  description: |
+    The contract between the backend and the frontend. Architect-owned.
+    x-planned: true marks an operation that is not built yet. check:contracts
+    allows a planned operation to be missing. The architect removes the flag
+    when the operation is merged.
 paths:
   /health:
     get:
@@ -14,6 +19,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+
+  /auth/register:
+    post:
+      x-planned: true
+      operationId: register
+      summary: Create a user. It does not log the user in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+      responses:
+        "201":
+          description: The user was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          description: A user with this email exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: The email or the password is not valid.
+
+  /auth/login:
+    post:
+      x-planned: true
+      operationId: login
+      summary: Log in. The response sets the httpOnly session cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+      responses:
+        "200":
+          description: Logged in. The Set-Cookie header holds the session JWT.
+          headers:
+            Set-Cookie:
+              description: "session=<JWT>; HttpOnly; SameSite=Lax; Path=/"
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: The email or the password is wrong. The response does not say which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      x-planned: true
+      operationId: logout
+      summary: Log out. The response clears the session cookie.
+      responses:
+        "204":
+          description: Logged out. It also returns 204 without a session.
+
+  /auth/me:
+    get:
+      x-planned: true
+      operationId: read_me
+      summary: Return the user of the session cookie.
+      responses:
+        "200":
+          description: The current user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   schemas:
     Health:
@@ -23,3 +114,34 @@ components:
         status:
           type: string
           const: ok
+
+    Credentials:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+
+    User:
+      type: object
+      required: [id, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string

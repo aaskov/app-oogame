@@ -10,6 +10,7 @@ app/modules/<module>/
   public_api.py     ← the only file that other modules and app/main.py import
   _internal/
     router.py       ← HTTP only. No business logic.
+    dependencies.py ← Depends() providers that build the service (session → repository → service)
     service.py      ← business logic
     repository.py   ← database access
     schemas.py      ← Pydantic models (model_config from_attributes=True)
@@ -18,14 +19,31 @@ tests/              ← tests for the backend
 ```
 
 Each layer imports only from layers below it:
-`router → service → repository → schemas | models`. A module can omit a layer.
+`router → dependencies → service → repository → schemas | models`. A module can omit a layer.
 Inject dependencies with `Depends()`. Do not create them inside a function body.
 
 ## Database
 
-Postgres runs next to the devcontainer (`docs/adr/0103`). Connect only in a
-`repository.py`, with `app.shared.db.connect()`. `DATABASE_URL` is set.
-Do not run schema migrations.
+Postgres runs next to the devcontainer (`docs/adr/0103`, `docs/adr/0104`).
+
+- The tables are SQLAlchemy classes in `app/shared/orm/`. You cannot change them.
+- A repository takes a `Session` and reads or writes those classes.
+- `dependencies.py` gets the session with `Depends(app.shared.db.get_session)`.
+- Only `dependencies.py` and `repository.py` import the database or SQLAlchemy.
+- Do not write or run migrations. If you need a column, ask with `needs-decision`.
+
+## Tests
+
+`tests/conftest.py` gives two fixtures. Each test runs in a transaction that
+rolls back, so tests do not see each other's data.
+
+- `client`: a `TestClient` for the app, with the test session.
+- `session`: the SQLAlchemy session of the test.
+
+## Settings
+
+`app.shared.config.get_settings()` has `jwt_secret`, `jwt_expires_minutes`,
+`session_cookie_name`, and `session_cookie_secure` (`docs/adr/0105`).
 
 ## Checks (all in `mise run check`)
 

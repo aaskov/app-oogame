@@ -91,4 +91,19 @@ fresh; printf '\n\n@router.get("/seeded")\ndef read_seeded() -> Health:\n    ret
   >>"$b/app/modules/health/_internal/router.py"
 expect 1 "check:contracts fails when the backend serves an operation that is not in the contract" slot contracts
 
+fresh; printf '  /seeded:\n    get:\n      x-planned: true\n      responses:\n        "200":\n          description: Seeded.\n' \
+  | sed -i '/^paths:$/r /dev/stdin' "$root/contracts/openapi.yaml"
+expect 0 "check:contracts allows a missing operation that is x-planned" slot contracts
+
+# --- the dependencies layer (docs/adr/0104) ------------------------------------
+
+fresh; printf 'from app.shared.db import get_session\n' >"$b/app/modules/health/_internal/dependencies.py"
+expect 0 "check:boundaries allows the dependencies layer to import the database" slot boundaries
+
+fresh; printf '\nfrom sqlalchemy.orm import Session\n' >>"$b/app/modules/health/_internal/service.py"
+expect 1 "check:boundaries fails when a service imports sqlalchemy" slot boundaries
+
+fresh; printf 'from app.modules.health._internal import router\n' >"$b/app/modules/health/_internal/dependencies.py"
+expect 1 "check:boundaries fails when dependencies imports the router" slot boundaries
+
 guardrails_result test_backend
