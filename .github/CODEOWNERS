@@ -44,3 +44,11 @@
 
 # Postgres sidecar (docs/adr/0103): shared database access.
 /backend/app/shared/              @aaskov
+
+# Auth prep (docs/adr/0104, 0105): the app entry, the migrations, the test fixtures, and the module APIs.
+/backend/app/main.py                    @aaskov
+/backend/alembic.ini                    @aaskov
+/backend/migrations/                    @aaskov
+/backend/tests/conftest.py              @aaskov
+/backend/app/modules/auth/public_api.py @aaskov
+/backend/app/modules/health/public_api.py @aaskov

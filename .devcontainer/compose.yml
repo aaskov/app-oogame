@@ -13,6 +13,8 @@ services:
       - ${HOME}/.config/agent-bot:/mnt/agent-bot:ro
     environment:
       DATABASE_URL: postgresql://app:app@db:5432/app
+      # Development only. A deployment sets its own secret (docs/adr/0105).
+      JWT_SECRET: dev-only-secret-do-not-use-in-production
     depends_on:
       db:
         condition: service_healthy

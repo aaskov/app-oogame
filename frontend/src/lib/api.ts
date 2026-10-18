@@ -1,13 +1,31 @@
-import type { components } from "@/types/api";
+/**
+ * The typed API client (docs/adr/0105). Architect-owned (CODEOWNERS).
+ *
+ * The types come from contracts/openapi.yaml (src/types/api.ts). Use it as
+ * api.GET("/auth/me") or api.POST("/auth/login", { body }). The browser sends
+ * the httpOnly session cookie with each request.
+ */
+import createClient from "openapi-fetch";
+
+import type { components, paths } from "@/types/api";
 
 export type Health = components["schemas"]["Health"];
+export type User = components["schemas"]["User"];
+export type Credentials = components["schemas"]["Credentials"];
+export type ApiError = components["schemas"]["Error"];
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export async function getHealth(fetcher: typeof fetch = fetch): Promise<Health> {
-  const response = await fetcher(`${baseUrl}/health`);
-  if (!response.ok) {
+export function createApi(fetcher: typeof fetch = globalThis.fetch) {
+  return createClient<paths>({ baseUrl, credentials: "include", fetch: fetcher });
+}
+
+export const api = createApi();
+
+export async function getHealth(client = api): Promise<Health> {
+  const { data, response } = await client.GET("/health");
+  if (!data) {
     throw new Error(`GET /health failed with status ${response.status}`);
   }
-  return (await response.json()) as Health;
+  return data;
 }
