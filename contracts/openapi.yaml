@@ -22,7 +22,6 @@ paths:
 
   /auth/register:
     post:
-      x-planned: true
       operationId: register
       summary: Create a user. It does not log the user in.
       requestBody:
@@ -49,7 +48,6 @@ paths:
 
   /auth/login:
     post:
-      x-planned: true
       operationId: login
       summary: Log in. The response sets the httpOnly session cookie.
       requestBody:
@@ -79,7 +77,6 @@ paths:
 
   /auth/logout:
     post:
-      x-planned: true
       operationId: logout
       summary: Log out. The response clears the session cookie.
       responses:
@@ -88,7 +85,6 @@ paths:
 
   /auth/me:
     get:
-      x-planned: true
       operationId: read_me
       summary: Return the user of the session cookie.
       responses:
