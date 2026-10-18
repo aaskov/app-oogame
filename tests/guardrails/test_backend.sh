@@ -75,6 +75,12 @@ expect 1 "check:boundaries fails when a service imports its router" slot boundar
 fresh; printf '\nfrom app.modules.health._internal import service\n' >>"$b/app/modules/health/_internal/schemas.py"
 expect 1 "check:boundaries fails when schemas import the service" slot boundaries
 
+fresh; printf '\nfrom app.shared import db\n' >>"$b/app/modules/health/_internal/service.py"
+expect 1 "check:boundaries fails when a service imports the database" slot boundaries
+
+fresh; printf 'from app.shared import db\n' >"$b/app/modules/health/_internal/repository.py"
+expect 0 "check:boundaries allows a repository to import the database" slot boundaries
+
 # --- check:contracts ----------------------------------------------------------
 
 fresh; printf '  /seeded:\n    get:\n      responses:\n        "200":\n          description: Seeded.\n' \
