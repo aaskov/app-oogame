@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Lint: ruff for the backend."
+#MISE description="Lint: ruff for the backend, eslint for the frontend."
 set -euo pipefail
 # shellcheck source=.mise/lib/stack.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
 
 if has_backend; then
-  (cd "$stack_target/backend" && py ruff check --no-cache .)
+  (cd "$stack_target/backend" && py ruff check --no-cache .) || exit 1
+fi
+
+if has_frontend; then
+  (cd "$stack_target/frontend" && node_tool eslint --max-warnings 0 --no-inline-config .) || exit 1
 fi

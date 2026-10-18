@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Boundaries: import-linter for the backend modules (docs/adr/0101)."
+#MISE description="Boundaries: import-linter for the backend (docs/adr/0101), dependency-cruiser for the frontend (docs/adr/0102)."
 set -euo pipefail
 # shellcheck source=.mise/lib/stack.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
 
 if has_backend; then
-  (cd "$stack_target/backend" && PYTHONPATH=. py lint-imports --no-cache)
+  (cd "$stack_target/backend" && PYTHONPATH=. py lint-imports --no-cache) || exit 1
+fi
+
+if has_frontend; then
+  (cd "$stack_target/frontend" && node_tool depcruise src --config .dependency-cruiser.cjs) || exit 1
 fi

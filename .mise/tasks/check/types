@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-#MISE description="Types: basedpyright for the backend."
+#MISE description="Types: basedpyright for the backend, tsc for the frontend."
 set -euo pipefail
 # shellcheck source=.mise/lib/stack.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
 
 if has_backend; then
-  (cd "$stack_target/backend" && py basedpyright --pythonpath "$stack_tools/backend/.venv/bin/python")
+  (cd "$stack_target/backend" && py basedpyright --pythonpath "$stack_tools/backend/.venv/bin/python") || exit 1
+fi
+
+if has_frontend; then
+  # Next.js generates its route types (LayoutProps, PageProps) into .next/types.
+  (cd "$stack_target/frontend" && node_tool next typegen >/dev/null && node_tool tsc --noEmit --incremental false) || exit 1
 fi

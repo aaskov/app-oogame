@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Tests: pytest for the backend."
+#MISE description="Tests: pytest for the backend, vitest for the frontend."
 set -euo pipefail
 # shellcheck source=.mise/lib/stack.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/stack.sh"
 
 if has_backend; then
-  (cd "$stack_target/backend" && py pytest -q -p no:cacheprovider)
+  (cd "$stack_target/backend" && py pytest -q -p no:cacheprovider) || exit 1
+fi
+
+if has_frontend; then
+  (cd "$stack_target/frontend" && node_tool vitest run --reporter=dot) || exit 1
 fi

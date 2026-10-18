@@ -17,3 +17,13 @@ py() {
 
 # has_backend: return 0 if the target has a backend.
 has_backend() { [ -f "$stack_target/backend/pyproject.toml" ]; }
+
+# node_tool <tool> [args...]: run a tool from frontend/node_modules/.bin.
+node_tool() {
+  local tool="$1"
+  shift
+  "$stack_tools/frontend/node_modules/.bin/$tool" "$@"
+}
+
+# has_frontend: return 0 if the target has a frontend.
+has_frontend() { [ -f "$stack_target/frontend/package.json" ]; }

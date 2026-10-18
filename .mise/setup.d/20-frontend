@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Install the frontend packages exactly as in package-lock.json (docs/adr/0102).
+set -euo pipefail
+npm ci --prefix frontend --no-fund --no-audit
