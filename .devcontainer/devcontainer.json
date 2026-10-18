@@ -1,15 +1,17 @@
 {
   "name": "${localWorkspaceFolderBasename}",
-  "build": { "dockerfile": "Dockerfile" },
+  // The container and its services are in compose.yml (docs/adr/0103).
+  "dockerComposeFile": "compose.yml",
+  "service": "dev",
+  "runServices": ["dev", "db"],
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
   "remoteUser": "vscode",
-  // The bind mount needs the folder to exist, also on CI runners without a key.
+  // The bind mount of the bot key needs the folder to exist, also on CI runners without a key.
   "initializeCommand": "mkdir -p \"$HOME/.config/agent-bot\"",
-  "mounts": [
-    "source=${localEnv:HOME}/.config/agent-bot,target=/mnt/agent-bot,type=bind,readonly"
-  ],
   "postCreateCommand": ".devcontainer/post-create.sh"
 }

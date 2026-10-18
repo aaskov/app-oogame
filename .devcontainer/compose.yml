@@ -1,0 +1,35 @@
+# The devcontainer and its services (docs/adr/0103). Guarded (CODEOWNERS).
+# No service publishes a host port. Each clone gets its own compose project,
+# so agents in parallel do not clash.
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sleep infinity
+    volumes:
+      - ..:/workspace:cached
+      # The agent bot key stays on the host (seed ADR 0005).
+      - ${HOME}/.config/agent-bot:/mnt/agent-bot:ro
+    environment:
+      DATABASE_URL: postgresql://app:app@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  db-data:

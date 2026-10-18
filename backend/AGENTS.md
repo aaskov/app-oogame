@@ -21,6 +21,12 @@ Each layer imports only from layers below it:
 `router → service → repository → schemas | models`. A module can omit a layer.
 Inject dependencies with `Depends()`. Do not create them inside a function body.
 
+## Database
+
+Postgres runs next to the devcontainer (`docs/adr/0103`). Connect only in a
+`repository.py`, with `app.shared.db.connect()`. `DATABASE_URL` is set.
+Do not run schema migrations.
+
 ## Checks (all in `mise run check`)
 
 | Check | Tool | Notes |

@@ -7,6 +7,7 @@ version = "0.0.0"
 requires-python = ">=3.13"
 dependencies = [
   "fastapi",
+  "psycopg[binary]",
   "uvicorn[standard]",
 ]
 
@@ -49,6 +50,8 @@ filterwarnings = ["error"]
 # --- check:boundaries (docs/adr/0101) -----------------------------------------
 [tool.importlinter]
 root_package = "app"
+# Needed to forbid an outside package, such as psycopg.
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Modules are independent. They meet only through public_api."
@@ -65,3 +68,17 @@ containers = ["app.modules.*._internal"]
 # Each layer is optional: the contract sets the direction, not the presence.
 layers = ["(router)", "(service)", "(repository)", "(schemas) | (models)"]
 exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "Only a repository accesses the database"
+type = "forbidden"
+source_modules = [
+  "app.modules.*._internal.router",
+  "app.modules.*._internal.service",
+  "app.modules.*._internal.schemas",
+  "app.modules.*._internal.models",
+]
+forbidden_modules = ["app.shared.db", "psycopg"]
+allow_indirect_imports = true
+# No module has a router-to-database path yet. The rule is for future modules.
+unmatched_ignore_imports_alerting = "none"

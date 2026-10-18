@@ -41,3 +41,6 @@
 /frontend/src/types/              @aaskov
 /frontend/AGENTS.md               @aaskov
 /frontend/CLAUDE.md               @aaskov
+
+# Postgres sidecar (docs/adr/0103): shared database access.
+/backend/app/shared/              @aaskov
