@@ -7,3 +7,4 @@ mise trust --yes mise.container.toml
 mise install
 mise run setup
 .devcontainer/agent-bot/setup.sh
+.devcontainer/claude-auth.sh

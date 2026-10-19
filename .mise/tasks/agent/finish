@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#MISE description="Host: remove the clone, containers, and database of an agent. It refuses if work is not pushed (docs/adr/0107)."
+#USAGE arg "<issue>" help="The GitHub issue number"
+set -euo pipefail
+
+issue="${1:?Usage: mise run agent:finish <issue>}"
+main="$(git rev-parse --show-toplevel)"
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+dir="$(dirname "$main")/$(basename "$main")-agent-$issue"
+[ -d "$dir" ] || { echo "agent:finish: $dir does not exist." >&2; exit 1; }
+
+# Refuse to delete work that only exists in the clone.
+if [ -n "$(git -C "$dir" status --porcelain)" ]; then
+  echo "agent:finish: $dir has uncommitted changes. Nothing was removed." >&2
+  exit 1
+fi
+branch="$(git -C "$dir" branch --show-current)"
+head="$(git -C "$dir" rev-parse HEAD)"
+pr_head="$(gh pr list -R "$repo" --head "$branch" --state all --limit 1 --json headRefOid --jq '.[0].headRefOid // ""')"
+git -C "$dir" fetch -q origin main
+ahead="$(git -C "$dir" rev-list --count origin/main..HEAD)"
+if [ "$head" != "$pr_head" ] && [ "$ahead" != 0 ]; then
+  echo "agent:finish: $branch has $ahead commit(s) that are not in a PR. Nothing was removed." >&2
+  exit 1
+fi
+
+project="$(docker ps -a --filter "label=devcontainer.local_folder=$dir" --format '{{.Label "com.docker.compose.project"}}' | head -n 1)"
+if [ -n "$project" ]; then
+  docker compose -p "$project" down -v --remove-orphans >/dev/null 2>&1
+else
+  docker ps -aq --filter "label=devcontainer.local_folder=$dir" | xargs -r docker rm -f >/dev/null
+fi
+rm -rf "$dir"
+echo "agent:finish: removed $dir, its containers, and its database."

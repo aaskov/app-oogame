@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 # The bind mount of the bot key needs the folder to exist, also on CI runners without a key.
-mkdir -p "$HOME/.config/agent-bot"
+mkdir -p "$HOME/.config/agent-bot" "$HOME/.config/claude-agent"
 
 # Host ports for the dev servers. Compose reads .env in this folder.
 # The main checkout gets fixed ports for the browser. An agent clone

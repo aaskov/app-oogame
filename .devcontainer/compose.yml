@@ -15,6 +15,8 @@ services:
       - ..:/workspace:cached
       # The agent bot key stays on the host (seed ADR 0005).
       - ${HOME}/.config/agent-bot:/mnt/agent-bot:ro
+      # The Claude Code token stays on the host (docs/adr/0107).
+      - ${HOME}/.config/claude-agent:/mnt/claude-agent:ro
     environment:
       DATABASE_URL: postgresql://app:app@db:5432/app
       # Development only. A deployment sets its own secret (docs/adr/0105).
