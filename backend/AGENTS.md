@@ -34,8 +34,9 @@ Postgres runs next to the devcontainer (`docs/adr/0103`, `docs/adr/0104`).
 
 ## Tests
 
-`tests/conftest.py` gives two fixtures. Each test runs in a transaction that
-rolls back, so tests do not see each other's data.
+`tests/conftest.py` gives two fixtures. Tests use their own database
+(`app_test`, `docs/adr/0108`), and each test runs in a transaction that rolls
+back, so tests do not see each other's data or development data.
 
 - `client`: a `TestClient` for the app, with the test session.
 - `session`: the SQLAlchemy session of the test.
