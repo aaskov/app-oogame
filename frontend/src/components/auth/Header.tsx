@@ -11,6 +11,9 @@ export function Header() {
     <header className="flex flex-wrap items-center justify-end gap-3 border-b border-zinc-200 px-4 py-3 text-sm">
       {loading ? null : user ? (
         <>
+          <Link href="/planets" className="underline">
+            Planets
+          </Link>
           <span>{user.email}</span>
           <button type="button" onClick={logout} className="rounded border border-zinc-400 px-3 py-1">
             Log out

@@ -34,6 +34,20 @@ describe("Header", () => {
     expect(screen.queryByRole("link", { name: "Log in" })).toBeNull();
   });
 
+  it("shows a Planets link for a logged-in user", async () => {
+    renderHeader({ "GET /auth/me": { status: 200, body: ada } });
+
+    const planets = await screen.findByRole("link", { name: "Planets" });
+    expect(planets.getAttribute("href")).toBe("/planets");
+  });
+
+  it("shows no Planets link without a user", async () => {
+    renderHeader({ "GET /auth/me": { status: 401 } });
+
+    await screen.findByRole("link", { name: "Log in" });
+    expect(screen.queryByRole("link", { name: "Planets" })).toBeNull();
+  });
+
   it("shows neither while the user loads", () => {
     renderHeader({ "GET /auth/me": { status: 200, body: ada } });
 
