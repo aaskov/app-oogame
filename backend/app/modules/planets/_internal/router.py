@@ -31,7 +31,7 @@ def list_planets(user_id: UserIdDep, service: ServiceDep) -> list[Planet]:
     "/{planet_id}/vault",
     operation_id="read_vault",
     response_model=VaultOut,
-    responses={401: {"model": ErrorOut}, 404: {"model": ErrorOut}},
+    responses={401: {"model": ErrorOut}, 404: {"model": ErrorOut}, 422: {}},
 )
 def read_vault(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> Vault:
     vault = service.read_vault(planet_id, user_id)

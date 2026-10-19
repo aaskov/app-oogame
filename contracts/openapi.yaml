@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.3.0
+  version: 0.3.1
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -74,6 +74,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "422":
+          description: The body is not valid Credentials.
 
   /auth/logout:
     post:
@@ -146,6 +148,8 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           $ref: "#/components/responses/PlanetNotFound"
+        "422":
+          description: The planet ID is not a UUID.
     patch:
       operationId: update_vault
       summary: Set new values in the vault of one planet of the logged-in user.

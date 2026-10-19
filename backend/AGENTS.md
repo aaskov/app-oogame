@@ -65,7 +65,7 @@ back, so tests do not see each other's data or development data.
 | `check:types` | basedpyright | `# type: ignore` has no effect. Fix the type. |
 | `check:test` | pytest | A warning fails the test run. |
 | `check:boundaries` | import-linter | Modules meet only through `public_api.py`. |
-| `check:contracts` | `.mise/lib/contract_check.py` | The app serves exactly the operations in `contracts/openapi.yaml`. |
+| `check:contracts` | `.mise/lib/contract_check.py` | The app serves exactly the operations in `contracts/openapi.yaml`, with equal schemas (`docs/adr/0110`). Each failure line names the field to fix. |
 
 You cannot change `pyproject.toml` or `uv.lock`. If you need a package or a
 config change, follow "When you are blocked" in the root `AGENTS.md`.

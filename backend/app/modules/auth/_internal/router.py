@@ -32,7 +32,7 @@ def register(credentials: Credentials, service: ServiceDep) -> User:
     "/login",
     operation_id="login",
     response_model=UserOut,
-    responses={401: {"model": ErrorOut}},
+    responses={401: {"model": ErrorOut}, 422: {}},
 )
 def login(
     credentials: Credentials,
