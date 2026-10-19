@@ -95,6 +95,19 @@ fresh; printf '  /seeded:\n    get:\n      x-planned: true\n      responses:\n  
   | sed -i '/^paths:$/r /dev/stdin' "$root/contracts/openapi.yaml"
 expect 0 "check:contracts allows a missing operation that is x-planned" slot contracts
 
+# --- schemas (docs/adr/0110) ---------------------------------------------------
+
+fresh; sed -i 's/^    password: Annotated\[str, StringConstraints(min_length=8, max_length=128)\]$/    password: Annotated[str, StringConstraints(min_length=8, max_length=128)] | None = None/' \
+  "$b/app/modules/auth/_internal/schemas.py"
+expect 1 "check:contracts fails when the backend accepts null for a contract field" slot contracts
+
+fresh; sed -i 's/min_length=8, max_length=128/max_length=128/' "$b/app/modules/auth/_internal/schemas.py"
+expect 1 "check:contracts fails when the backend lacks a contract constraint" slot contracts
+
+fresh; sed -i 's/^    responses={401: {"model": ErrorOut}},$/    responses={401: {"model": ErrorOut}, 403: {"model": ErrorOut}},/' \
+  "$b/app/modules/auth/_internal/router.py"
+expect 1 "check:contracts fails when the backend has a response code that is not in the contract" slot contracts
+
 # --- the dependencies layer (docs/adr/0104) ------------------------------------
 
 fresh; printf 'from app.shared.db import get_session\n' >"$b/app/modules/health/_internal/dependencies.py"

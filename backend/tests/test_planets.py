@@ -212,6 +212,8 @@ def test_update_vault_returns_404_for_another_users_planet_and_does_not_change_i
         {"metal": 9007199254740992},
         {"metal": 1.5},
         {"metal": "not a number"},
+        {"metal": None},
+        {"crystal": None, "deuterium": 5},
         {"unknown_field": 1},
     ],
 )

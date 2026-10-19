@@ -299,6 +299,13 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description The body is not valid Credentials. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     logout: {
@@ -407,6 +414,13 @@ export interface operations {
                 };
             };
             404: components["responses"]["PlanetNotFound"];
+            /** @description The planet ID is not a UUID. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     update_vault: {
