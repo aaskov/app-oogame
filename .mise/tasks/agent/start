@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#MISE description="Host: start an agent on an issue. Clone, branch, container, then Claude with the issue prompt (docs/adr/0107)."
+#USAGE arg "<issue>" help="The GitHub issue number"
+set -euo pipefail
+
+issue="${1:?Usage: mise run agent:start <issue>}"
+main="$(git rev-parse --show-toplevel)"
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+origin="$(git -C "$main" remote get-url origin)"
+dir="$(dirname "$main")/$(basename "$main")-agent-$issue"
+
+title="$(gh issue view "$issue" -R "$repo" --json title,state --jq 'select(.state == "OPEN") | .title')"
+[ -n "$title" ] || { echo "agent:start: issue #$issue is not open in $repo." >&2; exit 1; }
+slug="$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-30 | sed -E 's/-+$//')"
+branch="agent/$issue-$slug"
+
+if [ -e "$dir" ]; then
+  echo "agent:start: $dir exists. Run 'mise run agent:finish $issue' first, or continue there." >&2
+  exit 1
+fi
+
+echo "agent:start: #$issue \"$title\" → $branch in $dir"
+git clone -q "$origin" "$dir"
+git -C "$dir" switch -q -c "$branch"
+devcontainer up --workspace-folder "$dir" >"$dir.up.log" 2>&1 ||
+  { tail -n 30 "$dir.up.log" >&2; echo "agent:start: devcontainer up failed. Log: $dir.up.log" >&2; exit 1; }
+rm -f "$dir.up.log"
+
+prompt="Work on issue #$issue in $repo. Read it with \`gh issue view $issue\`.
+Read AGENTS.md, the AGENTS.md of each folder in the issue scope, and docs/adr/ first.
+The acceptance criteria are the scope. You are on the branch $branch.
+Work test-first. Run \`mise run check\` until it passes.
+Then push and open a PR with the PR template. Write \"Closes #$issue\".
+If you are blocked, follow \"When you are blocked\" in AGENTS.md and stop."
+
+if [ "${AGENT_START_NO_CLAUDE:-0}" = 1 ]; then
+  printf 'agent:start: ready. Prompt:\n%s\n' "$prompt"
+  exit 0
+fi
+exec devcontainer exec --workspace-folder "$dir" claude "$prompt"
