@@ -39,7 +39,7 @@ Then rebuild the devcontainer.
 The gate has five empty slots in `.mise/tasks/check/`: `lint`, `types`,
 `test`, `boundaries`, and `contracts`. To add a stack:
 
-1. Add the tools to `[tools]` in `mise.toml`.
+1. Add the tools to `[tools]` in `mise.container.toml`. Only the devcontainer loads that file.
 2. Replace each slot file with a script that runs the tool.
 3. Add the stack manifests, such as `pyproject.toml`, to `.github/CODEOWNERS`.
 
