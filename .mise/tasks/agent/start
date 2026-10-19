@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Host: start an agent on an issue. Clone, branch, container, then Claude with the issue prompt (docs/adr/0107)."
+#MISE description="Host: start an agent on an issue. Clone, branch, container, then Claude with the issue prompt (docs/adr/0006)."
 #USAGE arg "<issue>" help="The GitHub issue number"
 set -euo pipefail
 

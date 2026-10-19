@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Host: remove the clone, containers, and database of an agent. It refuses if work is not pushed (docs/adr/0107)."
+#MISE description="Host: remove the clone, containers, and database of an agent. It refuses if work is not pushed (docs/adr/0006)."
 #USAGE arg "<issue>" help="The GitHub issue number"
 set -euo pipefail
 
 issue="${1:?Usage: mise run agent:finish <issue>}"
 main="$(git rev-parse --show-toplevel)"
-repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 dir="$(dirname "$main")/$(basename "$main")-agent-$issue"
 [ -d "$dir" ] || { echo "agent:finish: $dir does not exist." >&2; exit 1; }
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 
 # Refuse to delete work that only exists in the clone.
 if [ -n "$(git -C "$dir" status --porcelain)" ]; then
