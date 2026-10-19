@@ -89,6 +89,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/planets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the planets of the logged-in user.
+         * @description If the user has no planets, the call first creates the home planet
+         *     "Homeworld" with its vault: metal 500, crystal 500, deuterium 0
+         *     (docs/adr/0109). The list is sorted by creation time, oldest first.
+         */
+        get: operations["list_planets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planets/{planet_id}/vault": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+            };
+            cookie?: never;
+        };
+        /** Return the vault of one planet of the logged-in user. */
+        get: operations["read_vault"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set new values in the vault of one planet of the logged-in user.
+         * @description Each field in the body replaces the stored value. A field that is not
+         *     in the body does not change.
+         */
+        patch: operations["update_vault"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -108,12 +154,52 @@ export interface components {
             /** Format: email */
             email: string;
         };
+        Planet: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        Vault: {
+            /** Format: uuid */
+            planet_id: string;
+            metal: components["schemas"]["Amount"];
+            crystal: components["schemas"]["Amount"];
+            deuterium: components["schemas"]["Amount"];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        VaultUpdate: {
+            metal?: components["schemas"]["Amount"];
+            crystal?: components["schemas"]["Amount"];
+            deuterium?: components["schemas"]["Amount"];
+        };
+        /**
+         * @description An amount of one resource. The maximum is the largest integer that
+         *     JavaScript can hold without a loss of precision.
+         */
+        Amount: number;
         Error: {
             detail: string;
         };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /**
+         * @description The planet does not exist, or it belongs to a different user. The
+         *     response is the same in both cases, so it does not tell an attacker
+         *     which planet IDs exist.
+         */
+        PlanetNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+    };
+    parameters: {
+        PlanetId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -259,6 +345,110 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+        };
+    };
+    list_planets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The planets of the logged-in user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Planet"][];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_vault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The vault of the planet. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vault"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["PlanetNotFound"];
+        };
+    };
+    update_vault: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VaultUpdate"];
+            };
+        };
+        responses: {
+            /** @description The vault after the update. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vault"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["PlanetNotFound"];
+            /** @description A value is below 0, above the maximum, or not an integer. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

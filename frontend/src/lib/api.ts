@@ -12,6 +12,9 @@ import type { components, paths } from "@/types/api";
 export type Health = components["schemas"]["Health"];
 export type User = components["schemas"]["User"];
 export type Credentials = components["schemas"]["Credentials"];
+export type Planet = components["schemas"]["Planet"];
+export type Vault = components["schemas"]["Vault"];
+export type VaultUpdate = components["schemas"]["VaultUpdate"];
 export type ApiError = components["schemas"]["Error"];
 
 export const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
