@@ -17,3 +17,7 @@ def test_users_table_exists(session: Session) -> None:
 
 def test_the_rollback_removed_the_user(session: Session) -> None:
     assert session.query(UserRow).filter_by(email="fixture@example.com").count() == 0
+
+
+def test_tests_use_their_own_database(session: Session) -> None:
+    assert session.execute(text("select current_database()")).scalar_one().endswith("_test")
