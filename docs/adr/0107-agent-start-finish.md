@@ -1,6 +1,10 @@
 # 0107 — Start and finish an agent with one command
 
-**Status:** Accepted · 2026-10-19
+**Status:** Accepted · 2026-10-19 · Superseded in part by seed ADR 0006 (seed v0.3.0)
+
+The tasks and the Claude token now come from the seed (`docs/adr/0006`). This
+app keeps the part that the seed does not have: random host ports for each
+clone (ADR 0106) and a database volume for each clone, in `compose.yml`.
 
 ## Context
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Let Claude Code in this container use the architect's long-lived token, so
-# each new container needs no /login (docs/adr/0107). Called from post-create.sh.
+# each new container needs no /login (docs/adr/0006). Called from post-create.sh.
 # The token stays on the host in ~/.config/claude-agent/oauth-token
 # (from 'claude setup-token') and is mounted read-only at /mnt/claude-agent.
 set -euo pipefail

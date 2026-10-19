@@ -34,6 +34,20 @@ Agents act as a GitHub App, not as you (docs/adr/0005). To turn it on:
 
 Then rebuild the devcontainer.
 
+## Agents
+
+Start and finish an agent from the host, in the main checkout (docs/adr/0006):
+
+```bash
+mise run agent:start <issue>    # clone, branch, container, Claude with the issue prompt
+mise run agent:finish <issue>   # it refuses if work is not pushed
+```
+
+So that an agent container needs no `/login`, run this once on the host:
+
+1. Run `claude setup-token` and copy the token.
+2. Save it in `~/.config/claude-agent/oauth-token`. Then run `chmod 600` on it.
+
 ## Add a stack
 
 The gate has five empty slots in `.mise/tasks/check/`: `lint`, `types`,
