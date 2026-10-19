@@ -104,7 +104,6 @@ paths:
   /planets:
     get:
       operationId: list_planets
-      x-planned: true
       summary: List the planets of the logged-in user.
       description: |
         If the user has no planets, the call first creates the home planet
@@ -131,7 +130,6 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: read_vault
-      x-planned: true
       summary: Return the vault of one planet of the logged-in user.
       responses:
         "200":
@@ -150,7 +148,6 @@ paths:
           $ref: "#/components/responses/PlanetNotFound"
     patch:
       operationId: update_vault
-      x-planned: true
       summary: Set new values in the vault of one planet of the logged-in user.
       description: |
         Each field in the body replaces the stored value. A field that is not
