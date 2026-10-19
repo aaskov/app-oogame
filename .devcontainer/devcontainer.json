@@ -11,7 +11,7 @@
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
   "remoteUser": "vscode",
-  // The bind mount of the bot key needs the folder to exist, also on CI runners without a key.
-  "initializeCommand": "mkdir -p \"$HOME/.config/agent-bot\"",
+  // Runs on the host: the bot key folder and the host ports (docs/adr/0106).
+  "initializeCommand": ".devcontainer/initialize.sh",
   "postCreateCommand": ".devcontainer/post-create.sh"
 }

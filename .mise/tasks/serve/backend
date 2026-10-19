@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run the backend dev server on port 8000, with reload (docs/adr/0106)."
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)/backend"
+exec uv run --locked uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
