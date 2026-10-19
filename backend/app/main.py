@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.modules.auth import public_api as auth
 from app.modules.health import public_api as health
+from app.modules.planets import public_api as planets
 from app.shared.config import get_settings
 
 
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(planets.router)
     return app
 
 

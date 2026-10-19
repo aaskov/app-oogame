@@ -53,3 +53,4 @@
 /backend/tests/conftest.py              @aaskov
 /backend/app/modules/auth/public_api.py @aaskov
 /backend/app/modules/health/public_api.py @aaskov
+/backend/app/modules/planets/public_api.py @aaskov

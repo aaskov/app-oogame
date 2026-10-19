@@ -32,6 +32,17 @@ Postgres runs next to the devcontainer (`docs/adr/0103`, `docs/adr/0104`).
 - Only `dependencies.py` and `repository.py` import the database or SQLAlchemy.
 - Do not write or run migrations. If you need a column, ask with `needs-decision`.
 
+## The logged-in user
+
+To know who calls an endpoint, use the provider from the auth module:
+`Depends(app.modules.auth.public_api.get_current_user_id)`. It returns the
+user ID, or it raises 401 (`docs/adr/0109`). Import it in `dependencies.py`
+or `router.py`. Never take a user ID from the URL or the body.
+
+If a URL names a resource that a user owns, for example a planet, load it
+with both its ID and the user ID. If it belongs to a different user, return
+the same 404 as for an ID that does not exist.
+
 ## Tests
 
 `tests/conftest.py` gives two fixtures. Tests use their own database

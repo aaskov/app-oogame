@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.2.0
+  version: 0.3.0
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -101,7 +101,105 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /planets:
+    get:
+      operationId: list_planets
+      x-planned: true
+      summary: List the planets of the logged-in user.
+      description: |
+        If the user has no planets, the call first creates the home planet
+        "Homeworld" with its vault: metal 500, crystal 500, deuterium 0
+        (docs/adr/0109). The list is sorted by creation time, oldest first.
+      responses:
+        "200":
+          description: The planets of the logged-in user.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Planet"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /planets/{planet_id}/vault:
+    parameters:
+      - $ref: "#/components/parameters/PlanetId"
+    get:
+      operationId: read_vault
+      x-planned: true
+      summary: Return the vault of one planet of the logged-in user.
+      responses:
+        "200":
+          description: The vault of the planet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vault"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/PlanetNotFound"
+    patch:
+      operationId: update_vault
+      x-planned: true
+      summary: Set new values in the vault of one planet of the logged-in user.
+      description: |
+        Each field in the body replaces the stored value. A field that is not
+        in the body does not change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VaultUpdate"
+      responses:
+        "200":
+          description: The vault after the update.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vault"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/PlanetNotFound"
+        "422":
+          description: A value is below 0, above the maximum, or not an integer.
+
 components:
+  parameters:
+    PlanetId:
+      name: planet_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    PlanetNotFound:
+      description: |
+        The planet does not exist, or it belongs to a different user. The
+        response is the same in both cases, so it does not tell an attacker
+        which planet IDs exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
   schemas:
     Health:
       type: object
@@ -134,6 +232,53 @@ components:
         email:
           type: string
           format: email
+
+    Planet:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 40
+
+    Vault:
+      type: object
+      required: [planet_id, metal, crystal, deuterium, updated_at]
+      properties:
+        planet_id:
+          type: string
+          format: uuid
+        metal:
+          $ref: "#/components/schemas/Amount"
+        crystal:
+          $ref: "#/components/schemas/Amount"
+        deuterium:
+          $ref: "#/components/schemas/Amount"
+        updated_at:
+          type: string
+          format: date-time
+
+    VaultUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        metal:
+          $ref: "#/components/schemas/Amount"
+        crystal:
+          $ref: "#/components/schemas/Amount"
+        deuterium:
+          $ref: "#/components/schemas/Amount"
+
+    Amount:
+      description: |
+        An amount of one resource. The maximum is the largest integer that
+        JavaScript can hold without a loss of precision.
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
 
     Error:
       type: object
