@@ -1,12 +1,16 @@
-# The devcontainer and its services (docs/adr/0103). Guarded (CODEOWNERS).
-# No service publishes a host port. Each clone gets its own compose project,
-# so agents in parallel do not clash.
+# The devcontainer and its services (docs/adr/0103, 0106). Guarded (CODEOWNERS).
+# Each clone gets its own compose project. Only dev publishes ports, on
+# 127.0.0.1: fixed for the main checkout, random for an agent clone
+# (.devcontainer/initialize.sh writes .env), so clones do not clash.
 services:
   dev:
     build:
       context: .
       dockerfile: Dockerfile
     command: sleep infinity
+    ports:
+      - "127.0.0.1:${BACKEND_HOST_PORT:-0}:8000"
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-0}:3000"
     volumes:
       - ..:/workspace:cached
       # The agent bot key stays on the host (seed ADR 0005).

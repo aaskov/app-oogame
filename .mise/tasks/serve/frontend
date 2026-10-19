@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run the frontend dev server on port 3000 (docs/adr/0106)."
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)/frontend"
+exec node_modules/.bin/next dev --hostname 0.0.0.0 --port 3000
