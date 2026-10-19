@@ -1,9 +1,6 @@
-# Tools and tasks for this repository.
-# A stack adds its tools under [tools] and fills the check slots in .mise/tasks/check/.
-
-[tools]
-uv = "0.13.1"
-node = "24.22.0"
+# Tasks for this repository. The host and the devcontainer both read this file.
+# The pinned tools are in mise.container.toml. Only the devcontainer loads it
+# (MISE_ENV=container), so host mise does not install them.
 
 [tasks.check]
 description = "Run the gate. It must pass before a merge."

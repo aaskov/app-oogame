@@ -12,3 +12,6 @@ RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PA
 # An agent runs plain shell commands. Without this, it finds other versions,
 # for example the Node that the Claude Code feature installs.
 ENV PATH="/home/vscode/.local/share/mise/shims:${PATH}"
+
+# Load mise.container.toml: the tools are for the container, not the host.
+ENV MISE_ENV=container

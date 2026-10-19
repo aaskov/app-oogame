@@ -13,6 +13,7 @@
 /README.md          @aaskov
 /.copier-answers.yml  @aaskov
 /mise.toml          @aaskov
+/mise.container.toml @aaskov
 /.mise/             @aaskov
 /.claude/           @aaskov
 /.githooks/         @aaskov
