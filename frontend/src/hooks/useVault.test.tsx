@@ -1,5 +1,5 @@
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApi } from "@/lib/api";
 import { useVault } from "@/hooks/useVault";
@@ -12,7 +12,8 @@ const vault = {
   metal: 500,
   crystal: 500,
   deuterium: 0,
-  updated_at: "2026-10-19T00:00:00Z",
+  production_per_hour: { metal: 3600, crystal: 1800, deuterium: 0 },
+  calculated_at: "2026-10-19T00:00:00.000Z",
 };
 
 type Route = { status: number; body?: unknown };
@@ -32,6 +33,15 @@ function fakeFetch(routes: Record<string, Route>, seen: Request[] = []) {
   };
 }
 
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date(vault.calculated_at));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("useVault", () => {
   it("has no vault when planetId is null", async () => {
     const client = createApi(fakeFetch({}));
@@ -39,6 +49,20 @@ describe("useVault", () => {
 
     expect(result.current.loading).toBe(false);
     expect(result.current.vault).toBeNull();
+    expect(result.current.amounts).toBeNull();
+  });
+
+  it("does not read the clock while rendering, only from an effect", () => {
+    const now = vi.spyOn(Date, "now");
+    const client = createApi(fakeFetch({}));
+
+    renderHook(() => useVault(null, client));
+
+    // With no planetId, no effect runs (there is nothing to fetch and no vault
+    // to tick), so a clock read here could only have come from the render
+    // itself. Next.js treats that as an unstable value during prerendering
+    // (https://nextjs.org/docs/messages/blocking-prerender-current-time-client).
+    expect(now).not.toHaveBeenCalled();
   });
 
   it("reads the vault of the given planet", async () => {
@@ -52,7 +76,24 @@ describe("useVault", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.vault).toEqual(vault);
+    expect(result.current.amounts).toEqual({ metal: 500, crystal: 500, deuterium: 0 });
     expect(seen[0]?.url.endsWith(`/planets/${planetId}/vault`)).toBe(true);
+  });
+
+  it("counts the amounts up each second from production_per_hour", async () => {
+    const client = createApi(
+      fakeFetch({ [`GET /planets/${planetId}/vault`]: { status: 200, body: vault } }),
+    );
+    const { result } = renderHook(() => useVault(planetId, client));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.amounts).toEqual({ metal: 500, crystal: 500, deuterium: 0 });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(result.current.amounts).toEqual({ metal: 501, crystal: 500, deuterium: 0 });
   });
 
   it("sets the error status on a 404", async () => {
@@ -66,6 +107,26 @@ describe("useVault", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.vault).toBeNull();
+    expect(result.current.amounts).toBeNull();
     expect(result.current.error).toBe(404);
+  });
+
+  it("lets a caller replace the vault, for example after an upgrade", async () => {
+    const client = createApi(
+      fakeFetch({ [`GET /planets/${planetId}/vault`]: { status: 200, body: vault } }),
+    );
+    const { result } = renderHook(() => useVault(planetId, client));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      result.current.setVault({
+        ...vault,
+        metal: 10,
+        calculated_at: new Date().toISOString(),
+      });
+    });
+
+    expect(result.current.amounts).toEqual({ metal: 10, crystal: 500, deuterium: 0 });
   });
 });

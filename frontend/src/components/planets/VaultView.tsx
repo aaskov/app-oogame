@@ -1,18 +1,26 @@
 "use client";
 
-import { useVault } from "@/hooks/useVault";
-import type { api } from "@/lib/api";
+import type { Amounts } from "@/hooks/useVault";
+import type { Vault } from "@/lib/api";
+
+const LABELS: { key: keyof Amounts; label: string }[] = [
+  { key: "metal", label: "Metal" },
+  { key: "crystal", label: "Crystal" },
+  { key: "deuterium", label: "Deuterium" },
+];
 
 export function VaultView({
-  planetId,
-  client,
+  vault,
+  amounts,
+  loading,
+  error,
 }: {
-  planetId: string | null;
-  client?: typeof api;
+  vault: Vault | null;
+  amounts: Amounts | null;
+  loading: boolean;
+  error: number | null;
 }) {
-  const { vault, loading, error } = useVault(planetId, client);
-
-  if (!planetId || loading) {
+  if (loading) {
     return null;
   }
 
@@ -24,25 +32,22 @@ export function VaultView({
     );
   }
 
-  if (!vault) {
+  if (!vault || !amounts) {
     return null;
   }
 
   return (
     <section aria-label="Vault" className="flex flex-col gap-6">
       <dl className="grid grid-cols-3 gap-4 text-center">
-        <div>
-          <dt className="text-sm text-zinc-500">Metal</dt>
-          <dd className="text-lg font-semibold">{vault.metal.toLocaleString("en-US")}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-zinc-500">Crystal</dt>
-          <dd className="text-lg font-semibold">{vault.crystal.toLocaleString("en-US")}</dd>
-        </div>
-        <div>
-          <dt className="text-sm text-zinc-500">Deuterium</dt>
-          <dd className="text-lg font-semibold">{vault.deuterium.toLocaleString("en-US")}</dd>
-        </div>
+        {LABELS.map(({ key, label }) => (
+          <div key={key}>
+            <dt className="text-sm text-zinc-500">{label}</dt>
+            <dd className="text-lg font-semibold">{amounts[key].toLocaleString("en-US")}</dd>
+            <dd className="text-xs text-zinc-400">
+              +{vault.production_per_hour[key].toLocaleString("en-US")}/h
+            </dd>
+          </div>
+        ))}
       </dl>
     </section>
   );
