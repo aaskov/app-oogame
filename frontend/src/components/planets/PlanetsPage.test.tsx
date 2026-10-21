@@ -47,7 +47,7 @@ describe("PlanetsPage", () => {
     expect(
       screen.getByRole("button", { name: "Homeworld" }).getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(await screen.findByLabelText("Metal")).toHaveProperty("value", "500");
+    expect((await screen.findByText("Metal")).nextElementSibling?.textContent).toBe("500");
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -62,9 +62,11 @@ describe("PlanetsPage", () => {
       },
     });
 
-    await screen.findByLabelText("Metal");
+    await screen.findByText("Metal");
     fireEvent.click(screen.getByRole("button", { name: "Colony" }));
 
-    await waitFor(() => expect(screen.getByLabelText("Metal")).toHaveProperty("value", "42"));
+    await waitFor(() =>
+      expect(screen.getByText("Metal").nextElementSibling?.textContent).toBe("42"),
+    );
   });
 });

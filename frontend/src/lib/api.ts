@@ -14,7 +14,10 @@ export type User = components["schemas"]["User"];
 export type Credentials = components["schemas"]["Credentials"];
 export type Planet = components["schemas"]["Planet"];
 export type Vault = components["schemas"]["Vault"];
-export type VaultUpdate = components["schemas"]["VaultUpdate"];
+export type Resources = components["schemas"]["Resources"];
+export type MineKind = components["schemas"]["MineKind"];
+export type Mine = components["schemas"]["Mine"];
+export type MineUpgrade = components["schemas"]["MineUpgrade"];
 export type ApiError = components["schemas"]["Error"];
 
 export const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";

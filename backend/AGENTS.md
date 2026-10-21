@@ -55,7 +55,8 @@ back, so tests do not see each other's data or development data.
 ## Settings
 
 `app.shared.config.get_settings()` has `jwt_secret`, `jwt_expires_minutes`,
-`session_cookie_name`, and `session_cookie_secure` (`docs/adr/0105`).
+`session_cookie_name`, `session_cookie_secure` (`docs/adr/0105`), and
+`game_speed` (`docs/adr/0111`).
 
 ## Checks (all in `mise run check`)
 

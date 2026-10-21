@@ -120,19 +120,67 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Return the vault of one planet of the logged-in user. */
+        /**
+         * Return the vault of one planet of the logged-in user, with its production.
+         * @description The amounts are calculated at calculated_at: the stored amounts plus the
+         *     production since the last change (docs/adr/0111). A client can count up
+         *     from calculated_at with production_per_hour.
+         */
         get: operations["read_vault"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planets/{planet_id}/mines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+            };
+            cookie?: never;
+        };
         /**
-         * Set new values in the vault of one planet of the logged-in user.
-         * @description Each field in the body replaces the stored value. A field that is not
-         *     in the body does not change.
+         * List the three mines of one planet of the logged-in user.
+         * @description Always three mines, in the order metal_mine, crystal_mine,
+         *     deuterium_synthesizer. A mine that was never upgraded has level 0.
          */
-        patch: operations["update_vault"];
+        get: operations["list_mines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planets/{planet_id}/mines/{mine}/upgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+                mine: components["parameters"]["MineKind"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upgrade one mine by one level. It costs resources from the vault.
+         * @description The upgrade is instant. The server first adds the production up to now,
+         *     then subtracts the cost and raises the level, in one transaction. Two
+         *     upgrades at the same time cannot spend the same resources (docs/adr/0111).
+         */
+        post: operations["upgrade_mine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -165,13 +213,28 @@ export interface components {
             metal: components["schemas"]["Amount"];
             crystal: components["schemas"]["Amount"];
             deuterium: components["schemas"]["Amount"];
+            production_per_hour: components["schemas"]["Resources"];
             /** Format: date-time */
-            updated_at: string;
+            calculated_at: string;
         };
-        VaultUpdate: {
-            metal?: components["schemas"]["Amount"];
-            crystal?: components["schemas"]["Amount"];
-            deuterium?: components["schemas"]["Amount"];
+        Resources: {
+            metal: components["schemas"]["Amount"];
+            crystal: components["schemas"]["Amount"];
+            deuterium: components["schemas"]["Amount"];
+        };
+        /** @enum {string} */
+        MineKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer";
+        Mine: {
+            kind: components["schemas"]["MineKind"];
+            level: number;
+            /** @description What this mine adds per hour, at its level, without the base income. */
+            production_per_hour: components["schemas"]["Amount"];
+            /** @description The cost of the next level. */
+            upgrade_cost: components["schemas"]["Resources"];
+        };
+        MineUpgrade: {
+            mine: components["schemas"]["Mine"];
+            vault: components["schemas"]["Vault"];
         };
         /**
          * @description An amount of one resource. The maximum is the largest integer that
@@ -199,6 +262,7 @@ export interface components {
     };
     parameters: {
         PlanetId: string;
+        MineKind: components["schemas"]["MineKind"];
     };
     requestBodies: never;
     headers: never;
@@ -423,7 +487,7 @@ export interface operations {
             };
         };
     };
-    update_vault: {
+    list_mines: {
         parameters: {
             query?: never;
             header?: never;
@@ -432,19 +496,15 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VaultUpdate"];
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description The vault after the update. */
+            /** @description The mines of the planet. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Vault"];
+                    "application/json": components["schemas"]["Mine"][];
                 };
             };
             /** @description No valid session. */
@@ -457,7 +517,56 @@ export interface operations {
                 };
             };
             404: components["responses"]["PlanetNotFound"];
-            /** @description A value is below 0, above the maximum, or not an integer. */
+            /** @description The planet ID is not a UUID. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upgrade_mine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+                mine: components["parameters"]["MineKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The mine after the upgrade, and the vault after the cost. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MineUpgrade"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["PlanetNotFound"];
+            /** @description The vault has too little for the upgrade cost. Nothing changes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The planet ID is not a UUID, or the mine is not one of the three kinds. */
             422: {
                 headers: {
                     [name: string]: unknown;
