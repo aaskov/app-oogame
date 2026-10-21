@@ -30,15 +30,6 @@ describe("VaultView", () => {
     expect(screen.getAllByText("0").length).toBeGreaterThan(0);
   });
 
-  it("includes the form to set new values", async () => {
-    const client = createApi(
-      fakeFetch({ [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault } }),
-    );
-    render(<VaultView planetId={homeworld.id} client={client} />);
-
-    expect(await screen.findByLabelText("Metal")).toBeTruthy();
-  });
-
   it("shows 'This planet was not found.' on a 404", async () => {
     const client = createApi(
       fakeFetch({

@@ -17,16 +17,3 @@ class PlanetService:
 
     def read_vault(self, planet_id: UUID, user_id: UUID) -> Vault | None:
         return self._repository.get_vault(planet_id, user_id)
-
-    def update_vault(
-        self,
-        planet_id: UUID,
-        user_id: UUID,
-        *,
-        metal: int | None,
-        crystal: int | None,
-        deuterium: int | None,
-    ) -> Vault | None:
-        return self._repository.update_vault(
-            planet_id, user_id, metal=metal, crystal=crystal, deuterium=deuterium
-        )

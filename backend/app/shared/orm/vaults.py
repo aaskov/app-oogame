@@ -28,6 +28,8 @@ class VaultRow(Base):
     metal: Mapped[int] = mapped_column(BigInteger, default=START_METAL)
     crystal: Mapped[int] = mapped_column(BigInteger, default=START_CRYSTAL)
     deuterium: Mapped[int] = mapped_column(BigInteger, default=START_DEUTERIUM)
+    # The time of the stored amounts. The production since then is not stored
+    # yet (docs/adr/0111). A write sets it to the time of its calculation.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

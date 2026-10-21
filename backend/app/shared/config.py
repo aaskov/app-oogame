@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -12,6 +13,9 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     session_cookie_name: str = "session"
     session_cookie_secure: bool = False
+    # Multiplies each production (docs/adr/0111). Set GAME_SPEED=100 in development
+    # to see production at once.
+    game_speed: float = Field(default=1.0, gt=0)
 
 
 @lru_cache

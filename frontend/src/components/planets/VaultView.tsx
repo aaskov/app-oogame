@@ -1,6 +1,5 @@
 "use client";
 
-import { VaultForm } from "@/components/planets/VaultForm";
 import { useVault } from "@/hooks/useVault";
 import type { api } from "@/lib/api";
 
@@ -11,7 +10,7 @@ export function VaultView({
   planetId: string | null;
   client?: typeof api;
 }) {
-  const { vault, loading, error, update } = useVault(planetId, client);
+  const { vault, loading, error } = useVault(planetId, client);
 
   if (!planetId || loading) {
     return null;
@@ -45,7 +44,6 @@ export function VaultView({
           <dd className="text-lg font-semibold">{vault.deuterium.toLocaleString("en-US")}</dd>
         </div>
       </dl>
-      <VaultForm vault={vault} onUpdate={update} />
     </section>
   );
 }

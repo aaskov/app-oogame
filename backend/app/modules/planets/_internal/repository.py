@@ -65,29 +65,3 @@ class PlanetRepository:
             .where(VaultRow.planet_id == planet_id, PlanetRow.user_id == user_id)
         ).one_or_none()
         return _to_vault(row) if row else None
-
-    def update_vault(
-        self,
-        planet_id: UUID,
-        user_id: UUID,
-        *,
-        metal: int | None,
-        crystal: int | None,
-        deuterium: int | None,
-    ) -> Vault | None:
-        row = self._session.scalars(
-            select(VaultRow)
-            .join(PlanetRow, PlanetRow.id == VaultRow.planet_id)
-            .where(VaultRow.planet_id == planet_id, PlanetRow.user_id == user_id)
-        ).one_or_none()
-        if row is None:
-            return None
-        if metal is not None:
-            row.metal = metal
-        if crystal is not None:
-            row.crystal = crystal
-        if deuterium is not None:
-            row.deuterium = deuterium
-        self._session.commit()
-        self._session.refresh(row)
-        return _to_vault(row)
