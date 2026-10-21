@@ -1,10 +1,12 @@
+from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.modules.planets._internal.models import Planet, Vault
+from app.modules.planets._internal.models import Planet, StoredVault
+from app.shared.orm.buildings import BuildingRow
 from app.shared.orm.planets import HOME_PLANET_NAME, PlanetRow
 from app.shared.orm.vaults import START_CRYSTAL, START_DEUTERIUM, START_METAL, VaultRow
 
@@ -13,8 +15,8 @@ def _to_planet(row: PlanetRow) -> Planet:
     return Planet(id=row.id, name=row.name)
 
 
-def _to_vault(row: VaultRow) -> Vault:
-    return Vault(
+def _to_stored_vault(row: VaultRow) -> StoredVault:
+    return StoredVault(
         planet_id=row.planet_id,
         metal=row.metal,
         crystal=row.crystal,
@@ -58,10 +60,62 @@ class PlanetRepository:
             )
         self._session.commit()
 
-    def get_vault(self, planet_id: UUID, user_id: UUID) -> Vault | None:
+    def get_vault(self, planet_id: UUID, user_id: UUID) -> StoredVault | None:
         row = self._session.scalars(
             select(VaultRow)
             .join(PlanetRow, PlanetRow.id == VaultRow.planet_id)
             .where(VaultRow.planet_id == planet_id, PlanetRow.user_id == user_id)
         ).one_or_none()
-        return _to_vault(row) if row else None
+        return _to_stored_vault(row) if row else None
+
+    def lock_vault(self, planet_id: UUID, user_id: UUID) -> StoredVault | None:
+        """Return the vault with a row lock (SELECT ... FOR UPDATE, docs/adr/0111).
+
+        The lock belongs to the current transaction. The caller commits or
+        rolls back to release it.
+        """
+        row = self._session.scalars(
+            select(VaultRow)
+            .join(PlanetRow, PlanetRow.id == VaultRow.planet_id)
+            .where(VaultRow.planet_id == planet_id, PlanetRow.user_id == user_id)
+            .with_for_update(of=VaultRow)
+        ).one_or_none()
+        return _to_stored_vault(row) if row else None
+
+    def planet_owned_by(self, planet_id: UUID, user_id: UUID) -> bool:
+        return (
+            self._session.scalars(
+                select(PlanetRow.id).where(PlanetRow.id == planet_id, PlanetRow.user_id == user_id)
+            ).one_or_none()
+            is not None
+        )
+
+    def get_building_levels(self, planet_id: UUID) -> dict[str, int]:
+        rows = self._session.scalars(select(BuildingRow).where(BuildingRow.planet_id == planet_id))
+        return {row.kind: row.level for row in rows}
+
+    def update_vault_amounts(
+        self, planet_id: UUID, metal: int, crystal: int, deuterium: int, at: datetime
+    ) -> None:
+        self._session.execute(
+            update(VaultRow)
+            .where(VaultRow.planet_id == planet_id)
+            .values(metal=metal, crystal=crystal, deuterium=deuterium, updated_at=at)
+        )
+
+    def set_building_level(self, planet_id: UUID, kind: str, level: int) -> None:
+        statement = (
+            insert(BuildingRow)
+            .values(planet_id=planet_id, kind=kind, level=level)
+            .on_conflict_do_update(
+                index_elements=["planet_id", "kind"],
+                set_={"level": level},
+            )
+        )
+        self._session.execute(statement)
+
+    def commit(self) -> None:
+        self._session.commit()
+
+    def rollback(self) -> None:
+        self._session.rollback()
