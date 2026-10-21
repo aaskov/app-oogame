@@ -21,7 +21,11 @@ function amountsAt(vault: Vault, now: number): Amounts {
 
 export function useVault(planetId: string | null, client: Api = defaultApi) {
   const [vault, setVaultState] = useState<Vault | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  // 0, not Date.now(): reading the clock during render is unsafe under prerendering
+  // (https://nextjs.org/docs/messages/blocking-prerender-current-time-client). The
+  // real time is set from an effect (below) or from setVault, before vault is ever
+  // non-null, so this initial value is never used to compute amounts.
+  const [now, setNow] = useState(0);
   const [error, setError] = useState<number | null>(null);
   const [loadedPlanetId, setLoadedPlanetId] = useState<string | null>(null);
 

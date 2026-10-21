@@ -52,6 +52,19 @@ describe("useVault", () => {
     expect(result.current.amounts).toBeNull();
   });
 
+  it("does not read the clock while rendering, only from an effect", () => {
+    const now = vi.spyOn(Date, "now");
+    const client = createApi(fakeFetch({}));
+
+    renderHook(() => useVault(null, client));
+
+    // With no planetId, no effect runs (there is nothing to fetch and no vault
+    // to tick), so a clock read here could only have come from the render
+    // itself. Next.js treats that as an unstable value during prerendering
+    // (https://nextjs.org/docs/messages/blocking-prerender-current-time-client).
+    expect(now).not.toHaveBeenCalled();
+  });
+
   it("reads the vault of the given planet", async () => {
     const seen: Request[] = [];
     const client = createApi(
