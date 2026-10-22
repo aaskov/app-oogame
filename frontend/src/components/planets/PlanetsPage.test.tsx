@@ -3,7 +3,15 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlanetsPage } from "@/components/planets/PlanetsPage";
-import { colony, fakeFetch, homeworld, mineUpgrade, mines, vault } from "@/components/planets/fakeFetch";
+import {
+  buildingUpgrade,
+  buildings,
+  buildingsAfterUpgrade,
+  colony,
+  fakeFetch,
+  homeworld,
+  vault,
+} from "@/components/planets/fakeFetch";
 import { AuthContext, useAuthState } from "@/hooks/useAuth";
 import { createApi } from "@/lib/api";
 
@@ -47,7 +55,7 @@ describe("PlanetsPage", () => {
       "GET /auth/me": { status: 200, body: ada },
       "GET /planets": { status: 200, body: [homeworld, colony] },
       [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault },
-      [`GET /planets/${homeworld.id}/mines`]: { status: 200, body: mines },
+      [`GET /planets/${homeworld.id}/buildings`]: { status: 200, body: buildings },
     });
 
     expect(await screen.findByRole("button", { name: "Homeworld" })).toBeTruthy();
@@ -63,12 +71,12 @@ describe("PlanetsPage", () => {
       "GET /auth/me": { status: 200, body: ada },
       "GET /planets": { status: 200, body: [homeworld, colony] },
       [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault },
-      [`GET /planets/${homeworld.id}/mines`]: { status: 200, body: mines },
+      [`GET /planets/${homeworld.id}/buildings`]: { status: 200, body: buildings },
       [`GET /planets/${colony.id}/vault`]: {
         status: 200,
         body: { ...vault, planet_id: colony.id, metal: 42 },
       },
-      [`GET /planets/${colony.id}/mines`]: { status: 200, body: mines },
+      [`GET /planets/${colony.id}/buildings`]: { status: 200, body: buildings },
     });
 
     await screen.findByText("Metal");
@@ -79,26 +87,51 @@ describe("PlanetsPage", () => {
     );
   });
 
-  it("shows the mines, and updates the vault and the mine after a 200 upgrade", async () => {
+  it("shows the four buildings and the energy line", async () => {
     renderPage({
       "GET /auth/me": { status: 200, body: ada },
-      "GET /planets": { status: 200, body: [homeworld, colony] },
-      [`GET /planets/${homeworld.id}/vault`]: {
-        status: 200,
-        body: { ...vault, metal: 1000, crystal: 1000 },
-      },
-      [`GET /planets/${homeworld.id}/mines`]: { status: 200, body: mines },
-      [`POST /planets/${homeworld.id}/mines/metal_mine/upgrade`]: { status: 200, body: mineUpgrade },
+      "GET /planets": { status: 200, body: [homeworld] },
+      [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault },
+      [`GET /planets/${homeworld.id}/buildings`]: { status: 200, body: buildings },
     });
+
+    expect(await screen.findByText("Solar plant")).toBeTruthy();
+    expect(screen.getByText("Metal mine")).toBeTruthy();
+    expect(screen.getByText("Energy: 22 / 22")).toBeTruthy();
+    expect(screen.queryByText(/Energy is too low/)).toBeNull();
+  });
+
+  it("updates the vault, the energy warning, and the other mines after a 200 upgrade", async () => {
+    const seen: Request[] = [];
+    renderPage(
+      {
+        "GET /auth/me": { status: 200, body: ada },
+        "GET /planets": { status: 200, body: [homeworld, colony] },
+        [`GET /planets/${homeworld.id}/vault`]: {
+          status: 200,
+          body: { ...vault, metal: 1000, crystal: 1000 },
+        },
+        [`GET /planets/${homeworld.id}/buildings`]: [
+          { status: 200, body: buildings },
+          { status: 200, body: buildingsAfterUpgrade },
+        ],
+        [`POST /planets/${homeworld.id}/buildings/metal_mine/upgrade`]: {
+          status: 200,
+          body: buildingUpgrade,
+        },
+      },
+      seen,
+    );
 
     expect(await screen.findByText("Metal mine")).toBeTruthy();
 
-    const button = await screen.findByRole("button", { name: "Upgrade Metal mine" });
-    fireEvent.click(button);
+    fireEvent.click(await screen.findByRole("button", { name: "Upgrade Metal mine" }));
 
-    await waitFor(() => expect(screen.getByText("Metal").nextElementSibling?.textContent).toBe("940"));
-    expect(
-      screen.getByText((_, node) => node?.textContent === "Level 1 · +33/h"),
-    ).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Metal").nextElementSibling?.textContent).toBe("410"));
+    expect(screen.getByText("Energy: 22 / 35")).toBeTruthy();
+    expect(screen.getByText("Energy is too low. Mines produce 62 %.")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Level 1 · +13/h")).toBeTruthy());
+    expect(screen.getByText("Level 2 · +45/h")).toBeTruthy();
+    expect(seen.some((r) => new URL(r.url).pathname.endsWith("/mines"))).toBe(false);
   });
 });

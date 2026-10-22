@@ -2,15 +2,20 @@
 
 import { useState } from "react";
 
-import { useMines } from "@/hooks/useMines";
+import { useBuildings } from "@/hooks/useBuildings";
 import type { Amounts } from "@/hooks/useVault";
-import type { api, Mine, MineKind, Resources, Vault } from "@/lib/api";
+import type { api, Building, BuildingKind, Resources, Vault } from "@/lib/api";
 
-const MINE_NAMES: Record<MineKind, string> = {
+const BUILDING_NAMES: Record<BuildingKind, string> = {
   metal_mine: "Metal mine",
   crystal_mine: "Crystal mine",
   deuterium_synthesizer: "Deuterium synthesizer",
+  solar_plant: "Solar plant",
 };
+
+function format(value: number) {
+  return value.toLocaleString("en-US");
+}
 
 function canAfford(amounts: Amounts | null, cost: Resources) {
   if (!amounts) {
@@ -21,7 +26,25 @@ function canAfford(amounts: Amounts | null, cost: Resources) {
   );
 }
 
-export function MinesView({
+function energyText({ produced, used }: Building["energy"]) {
+  if (produced > 0) {
+    return `+${format(produced)} energy`;
+  }
+  if (used > 0) {
+    return `−${format(used)} energy`;
+  }
+  return "0 energy";
+}
+
+function costText(cost: Resources) {
+  const parts = [`${format(cost.metal)} metal`, `${format(cost.crystal)} crystal`];
+  if (cost.deuterium > 0) {
+    parts.push(`${format(cost.deuterium)} deuterium`);
+  }
+  return `Cost: ${parts.join(", ")}`;
+}
+
+export function BuildingsView({
   planetId,
   client,
   amounts,
@@ -32,9 +55,9 @@ export function MinesView({
   amounts: Amounts | null;
   onUpgraded: (vault: Vault) => void;
 }) {
-  const { mines, loading, error, upgrade } = useMines(planetId, client);
+  const { buildings, loading, error, upgrade } = useBuildings(planetId, client);
   const [actionError, setActionError] = useState<number | null>(null);
-  const [pending, setPending] = useState<MineKind | null>(null);
+  const [pending, setPending] = useState<BuildingKind | null>(null);
   const [actionPlanetId, setActionPlanetId] = useState(planetId);
 
   if (planetId !== actionPlanetId) {
@@ -55,10 +78,10 @@ export function MinesView({
     );
   }
 
-  async function handleUpgrade(mine: MineKind) {
-    setPending(mine);
+  async function handleUpgrade(kind: BuildingKind) {
+    setPending(kind);
     setActionError(null);
-    const result = await upgrade(mine);
+    const result = await upgrade(kind);
     setPending(null);
     if (result.vault) {
       onUpgraded(result.vault);
@@ -68,7 +91,7 @@ export function MinesView({
   }
 
   return (
-    <section aria-label="Mines" className="flex flex-col gap-4">
+    <section aria-label="Buildings" className="flex flex-col gap-4">
       {actionError === 409 && (
         <p role="alert" className="text-sm text-red-600">
           Not enough resources.
@@ -80,26 +103,30 @@ export function MinesView({
         </p>
       )}
       <ul className="flex flex-col gap-3">
-        {mines.map((mine: Mine) => {
-          const name = MINE_NAMES[mine.kind];
-          const affordable = canAfford(amounts, mine.upgrade_cost);
+        {buildings.map((building) => {
+          const name = BUILDING_NAMES[building.kind];
+          const isMine = building.kind !== "solar_plant";
+          const affordable = canAfford(amounts, building.upgrade_cost);
           return (
-            <li key={mine.kind} className="flex items-center justify-between gap-4 border-b border-zinc-200 pb-3">
-              <div>
+            <li
+              key={building.kind}
+              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-zinc-200 pb-3"
+            >
+              <div className="min-w-0">
                 <p className="font-medium">{name}</p>
                 <p className="text-sm text-zinc-500">
-                  Level {mine.level} · +{mine.production_per_hour.toLocaleString("en-US")}/h
+                  {isMine
+                    ? `Level ${building.level} · +${format(building.production_per_hour)}/h`
+                    : `Level ${building.level}`}
                 </p>
-                <p className="text-sm text-zinc-500">
-                  Cost: {mine.upgrade_cost.metal.toLocaleString("en-US")} metal,{" "}
-                  {mine.upgrade_cost.crystal.toLocaleString("en-US")} crystal
-                </p>
+                <p className="text-sm text-zinc-500">{energyText(building.energy)}</p>
+                <p className="text-sm text-zinc-500">{costText(building.upgrade_cost)}</p>
               </div>
               <button
                 type="button"
                 aria-label={`Upgrade ${name}`}
-                disabled={!affordable || pending === mine.kind}
-                onClick={() => handleUpgrade(mine.kind)}
+                disabled={!affordable || pending === building.kind}
+                onClick={() => handleUpgrade(building.kind)}
                 className="rounded border border-zinc-900 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-300"
               >
                 Upgrade
