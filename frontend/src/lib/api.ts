@@ -18,6 +18,10 @@ export type Resources = components["schemas"]["Resources"];
 export type MineKind = components["schemas"]["MineKind"];
 export type Mine = components["schemas"]["Mine"];
 export type MineUpgrade = components["schemas"]["MineUpgrade"];
+export type BuildingKind = components["schemas"]["BuildingKind"];
+export type Building = components["schemas"]["Building"];
+export type BuildingUpgrade = components["schemas"]["BuildingUpgrade"];
+export type Energy = components["schemas"]["Energy"];
 export type ApiError = components["schemas"]["Error"];
 
 export const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
