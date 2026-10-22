@@ -13,6 +13,7 @@ const vault = {
   crystal: 500,
   deuterium: 0,
   production_per_hour: { metal: 3600, crystal: 1800, deuterium: 0 },
+  energy: { produced: 0, used: 0 },
   calculated_at: "2026-10-19T00:00:00.000Z",
 };
 
