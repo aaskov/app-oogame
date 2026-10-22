@@ -4,6 +4,8 @@
 set -euo pipefail
 
 issue="${1:?Usage: mise run agent:start <issue>}"
+# Agents use Sonnet. An architect session keeps the Claude default (docs/adr/0006).
+model="${AGENT_MODEL:-claude-sonnet-5-5}"
 main="$(git rev-parse --show-toplevel)"
 repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 origin="$(git -C "$main" remote get-url origin)"
@@ -34,7 +36,8 @@ Then push and open a PR with the PR template. Write \"Closes #$issue\".
 If you are blocked, follow \"When you are blocked\" in AGENTS.md and stop."
 
 if [ "${AGENT_START_NO_CLAUDE:-0}" = 1 ]; then
-  printf 'agent:start: ready. Prompt:\n%s\n' "$prompt"
+  printf 'agent:start: ready. Model: %s. Prompt:\n%s\n' "$model" "$prompt"
   exit 0
 fi
-exec devcontainer exec --workspace-folder "$dir" claude "$prompt"
+echo "agent:start: model $model"
+exec devcontainer exec --workspace-folder "$dir" claude --model "$model" "$prompt"
