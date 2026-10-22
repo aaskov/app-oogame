@@ -36,6 +36,8 @@ export function VaultView({
     return null;
   }
 
+  const { produced, used } = vault.energy;
+
   return (
     <section aria-label="Vault" className="flex flex-col gap-6">
       <dl className="grid grid-cols-3 gap-4 text-center">
@@ -49,6 +51,16 @@ export function VaultView({
           </div>
         ))}
       </dl>
+      <div className="text-center text-sm">
+        <p>
+          Energy: {produced.toLocaleString("en-US")} / {used.toLocaleString("en-US")}
+        </p>
+        {used > produced && (
+          <p role="status" className="text-red-600">
+            Energy is too low. Mines produce {Math.floor((produced * 100) / used)} %.
+          </p>
+        )}
+      </div>
     </section>
   );
 }

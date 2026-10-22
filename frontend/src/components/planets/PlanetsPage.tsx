@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { MinesView } from "@/components/planets/MinesView";
+import { BuildingsView } from "@/components/planets/BuildingsView";
 import { PlanetList } from "@/components/planets/PlanetList";
 import { VaultView } from "@/components/planets/VaultView";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,7 +45,7 @@ export function PlanetsPage({ client }: { client?: typeof api }) {
       <h1 className="text-2xl font-semibold">Planets</h1>
       <PlanetList planets={planets} selectedId={selectedId} onSelect={setSelectedId} />
       <VaultView vault={vault} amounts={amounts} loading={vaultLoading} error={vaultError} />
-      <MinesView planetId={selectedId} client={client} amounts={amounts} onUpgraded={setVault} />
+      <BuildingsView planetId={selectedId} client={client} amounts={amounts} onUpgraded={setVault} />
     </main>
   );
 }

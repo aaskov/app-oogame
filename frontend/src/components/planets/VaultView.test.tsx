@@ -35,6 +35,56 @@ describe("VaultView", () => {
     expect(screen.getByText("+15/h")).toBeTruthy();
   });
 
+  function renderWithEnergy(energy: { produced: number; used: number }) {
+    render(
+      <VaultView
+        vault={{ ...vault, energy }}
+        amounts={{ metal: 500, crystal: 500, deuterium: 0 }}
+        loading={false}
+        error={null}
+      />,
+    );
+  }
+
+  it("shows the energy as produced / used", () => {
+    renderWithEnergy({ produced: 22, used: 20 });
+
+    expect(screen.getByText("Energy: 22 / 20")).toBeTruthy();
+    expect(screen.queryByText(/Energy is too low/)).toBeNull();
+  });
+
+  it("shows the energy with thousands separators", () => {
+    renderWithEnergy({ produced: 12_345, used: 1_000 });
+
+    expect(screen.getByText("Energy: 12,345 / 1,000")).toBeTruthy();
+  });
+
+  it("shows no warning when the energy used equals the energy produced", () => {
+    renderWithEnergy({ produced: 24, used: 24 });
+
+    expect(screen.getByText("Energy: 24 / 24")).toBeTruthy();
+    expect(screen.queryByText(/Energy is too low/)).toBeNull();
+  });
+
+  it("warns when the energy used is more than produced, with the percent rounded down", () => {
+    renderWithEnergy({ produced: 22, used: 24 });
+
+    expect(screen.getByText("Energy: 22 / 24")).toBeTruthy();
+    expect(screen.getByText("Energy is too low. Mines produce 91 %.")).toBeTruthy();
+  });
+
+  it("rounds the percent down, not to the nearest number", () => {
+    renderWithEnergy({ produced: 1, used: 3 });
+
+    expect(screen.getByText("Energy is too low. Mines produce 33 %.")).toBeTruthy();
+  });
+
+  it("shows 0 % when no energy is produced", () => {
+    renderWithEnergy({ produced: 0, used: 11 });
+
+    expect(screen.getByText("Energy is too low. Mines produce 0 %.")).toBeTruthy();
+  });
+
   it("shows 'This planet was not found.' on a 404", () => {
     render(<VaultView vault={null} amounts={null} loading={false} error={404} />);
 
