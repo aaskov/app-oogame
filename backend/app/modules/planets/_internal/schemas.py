@@ -8,6 +8,7 @@ MAX_AMOUNT = 9007199254740991  # 2^53 - 1, the largest integer JavaScript holds 
 
 Amount = Annotated[int, Field(ge=0, le=MAX_AMOUNT)]
 MineKind = Literal["metal_mine", "crystal_mine", "deuterium_synthesizer"]
+BuildingKind = Literal["metal_mine", "crystal_mine", "deuterium_synthesizer", "solar_plant"]
 
 
 class PlanetOut(BaseModel):
@@ -25,6 +26,13 @@ class ResourcesOut(BaseModel):
     deuterium: Amount
 
 
+class EnergyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    produced: int = Field(ge=0)
+    used: int = Field(ge=0)
+
+
 class VaultOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -33,6 +41,7 @@ class VaultOut(BaseModel):
     crystal: Amount
     deuterium: Amount
     production_per_hour: ResourcesOut
+    energy: EnergyOut
     calculated_at: datetime
 
 
@@ -49,6 +58,23 @@ class MineUpgradeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     mine: MineOut
+    vault: VaultOut
+
+
+class BuildingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: BuildingKind
+    level: int = Field(ge=0)
+    production_per_hour: Amount
+    energy: EnergyOut
+    upgrade_cost: ResourcesOut
+
+
+class BuildingUpgradeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    building: BuildingOut
     vault: VaultOut
 
 

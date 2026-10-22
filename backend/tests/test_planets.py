@@ -180,6 +180,7 @@ def test_read_vault_at_level_0_after_two_hours(session: Session) -> None:
         "crystal",
         "deuterium",
         "production_per_hour",
+        "energy",
         "calculated_at",
     }
     assert body["metal"] == START_METAL + 60
@@ -238,8 +239,10 @@ def test_read_vault_at_level_3_after_two_hours(session: Session) -> None:
     register_and_login(client, "ada@example.com")
     [planet] = client.get("/planets").json()
     planet_id = UUID(planet["id"])
+    # Mines of level 3 use 157 energy. A solar plant of level 5 makes 161: factor 1.
     for kind in ("metal_mine", "crystal_mine", "deuterium_synthesizer"):
         set_building_level(session, planet_id, kind, 3)
+    set_building_level(session, planet_id, "solar_plant", 5)
     base_time = datetime(2026, 1, 1, tzinfo=UTC)
     session.execute(
         update(VaultRow).where(VaultRow.planet_id == planet_id).values(updated_at=base_time)
@@ -354,6 +357,7 @@ def test_list_mines_returns_the_production_and_the_cost_at_a_level(
     register_and_login(client, "ada@example.com")
     [planet] = client.get("/planets").json()
     set_building_level(session, UUID(planet["id"]), "metal_mine", 3)
+    set_building_level(session, UUID(planet["id"]), "solar_plant", 2)
 
     response = client.get(f"/planets/{planet['id']}/mines")
 

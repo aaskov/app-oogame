@@ -3,8 +3,13 @@ from datetime import datetime
 from uuid import UUID
 
 from app.modules.planets._internal.models import (
+    BUILDING_ORDER,
     MAX_AMOUNT,
     MINE_ORDER,
+    Building,
+    BuildingKind,
+    BuildingUpgrade,
+    Energy,
     Mine,
     MineKind,
     MineUpgrade,
@@ -16,21 +21,30 @@ from app.modules.planets._internal.models import (
 from app.modules.planets._internal.repository import PlanetRepository
 from app.shared.config import Settings
 
-# Mine production per hour at level L, before GAME_SPEED (docs/adr/0111).
-_MINE_COEFFICIENT: dict[MineKind, int] = {
+# Mine production per hour at level L, before the factor and GAME_SPEED (docs/adr/0111).
+_MINE_COEFFICIENT: dict[str, int] = {
     "metal_mine": 30,
     "crystal_mine": 20,
     "deuterium_synthesizer": 10,
 }
 
+# Energy at level L is coefficient · L · 1.1^L, rounded down (docs/adr/0112).
+_ENERGY_PRODUCED_COEFFICIENT: dict[str, int] = {"solar_plant": 20}
+_ENERGY_USED_COEFFICIENT: dict[str, int] = {
+    "metal_mine": 10,
+    "crystal_mine": 10,
+    "deuterium_synthesizer": 20,
+}
+
 # The base income of each planet per hour, before GAME_SPEED (docs/adr/0111).
 _BASE_INCOME = Resources(metal=30, crystal=15, deuterium=0)
 
-# (metal base, crystal base, ratio) for the cost of the next level (docs/adr/0111).
-_UPGRADE_COST: dict[MineKind, tuple[float, float, float]] = {
+# (metal base, crystal base, ratio) for the cost of the next level (docs/adr/0111, 0112).
+_UPGRADE_COST: dict[BuildingKind, tuple[float, float, float]] = {
     "metal_mine": (60, 15, 1.5),
     "crystal_mine": (48, 24, 1.6),
     "deuterium_synthesizer": (225, 75, 1.5),
+    "solar_plant": (75, 30, 1.5),
 }
 
 
@@ -42,12 +56,35 @@ def _clamp(amount: int) -> int:
     return min(amount, MAX_AMOUNT)
 
 
-def _mine_production_per_hour(kind: MineKind, level: int, game_speed: float) -> int:
-    raw = _MINE_COEFFICIENT[kind] * level * 1.1**level
-    return _clamp(math.floor(raw * game_speed))
+def _building_energy(kind: str, level: int) -> Energy:
+    growth = level * 1.1**level
+    return Energy(
+        produced=math.floor(_ENERGY_PRODUCED_COEFFICIENT.get(kind, 0) * growth),
+        used=math.floor(_ENERGY_USED_COEFFICIENT.get(kind, 0) * growth),
+    )
 
 
-def _upgrade_cost(kind: MineKind, level: int) -> Resources:
+def _planet_energy(levels: dict[str, int]) -> Energy:
+    energies = [_building_energy(kind, level) for kind, level in levels.items()]
+    return Energy(
+        produced=sum(energy.produced for energy in energies),
+        used=sum(energy.used for energy in energies),
+    )
+
+
+def _energy_factor(energy: Energy) -> float:
+    if energy.used == 0:
+        return 1.0
+    return min(1.0, energy.produced / energy.used)
+
+
+def _mine_production_per_hour(kind: str, level: int, factor: float, game_speed: float) -> int:
+    """The production of one building. 0 for a building that is not a mine."""
+    raw = _MINE_COEFFICIENT.get(kind, 0) * level * 1.1**level
+    return _clamp(math.floor(raw * factor * game_speed))
+
+
+def _upgrade_cost(kind: BuildingKind, level: int) -> Resources:
     metal_base, crystal_base, ratio = _UPGRADE_COST[kind]
     return Resources(
         metal=_clamp(math.floor(metal_base * ratio**level)),
@@ -56,22 +93,17 @@ def _upgrade_cost(kind: MineKind, level: int) -> Resources:
     )
 
 
-def _vault_production_per_hour(levels: dict[str, int], game_speed: float) -> Resources:
+def _vault_production_per_hour(
+    levels: dict[str, int], factor: float, game_speed: float
+) -> Resources:
+    def per_hour(base: int, kind: str) -> int:
+        mine = _mine_production_per_hour(kind, levels.get(kind, 0), factor, game_speed)
+        return _clamp(math.floor(base * game_speed) + mine)
+
     return Resources(
-        metal=_clamp(
-            math.floor(_BASE_INCOME.metal * game_speed)
-            + _mine_production_per_hour("metal_mine", levels.get("metal_mine", 0), game_speed)
-        ),
-        crystal=_clamp(
-            math.floor(_BASE_INCOME.crystal * game_speed)
-            + _mine_production_per_hour("crystal_mine", levels.get("crystal_mine", 0), game_speed)
-        ),
-        deuterium=_clamp(
-            math.floor(_BASE_INCOME.deuterium * game_speed)
-            + _mine_production_per_hour(
-                "deuterium_synthesizer", levels.get("deuterium_synthesizer", 0), game_speed
-            )
-        ),
+        metal=per_hour(_BASE_INCOME.metal, "metal_mine"),
+        crystal=per_hour(_BASE_INCOME.crystal, "crystal_mine"),
+        deuterium=per_hour(_BASE_INCOME.deuterium, "deuterium_synthesizer"),
     )
 
 
@@ -99,36 +131,50 @@ class PlanetService:
         levels = self._repository.get_building_levels(planet_id)
         return self._vault_from_row(row, levels)
 
+    def list_buildings(self, planet_id: UUID, user_id: UUID) -> list[Building] | None:
+        if not self._repository.planet_owned_by(planet_id, user_id):
+            return None
+        levels = self._repository.get_building_levels(planet_id)
+        return [self._building(kind, levels) for kind in BUILDING_ORDER]
+
     def list_mines(self, planet_id: UUID, user_id: UUID) -> list[Mine] | None:
         if not self._repository.planet_owned_by(planet_id, user_id):
             return None
         levels = self._repository.get_building_levels(planet_id)
-        game_speed = self._settings.game_speed
-        return [
-            Mine(
-                kind=kind,
-                level=levels.get(kind, 0),
-                production_per_hour=_mine_production_per_hour(
-                    kind, levels.get(kind, 0), game_speed
-                ),
-                upgrade_cost=_upgrade_cost(kind, levels.get(kind, 0)),
-            )
-            for kind in MINE_ORDER
-        ]
+        return [self._mine(kind, levels) for kind in MINE_ORDER]
+
+    def upgrade_building(
+        self, planet_id: UUID, user_id: UUID, kind: BuildingKind
+    ) -> BuildingUpgrade | None:
+        result = self._upgrade(planet_id, user_id, kind)
+        if result is None:
+            return None
+        levels, vault = result
+        return BuildingUpgrade(building=self._building(kind, levels), vault=vault)
 
     def upgrade_mine(self, planet_id: UUID, user_id: UUID, kind: MineKind) -> MineUpgrade | None:
+        result = self._upgrade(planet_id, user_id, kind)
+        if result is None:
+            return None
+        levels, vault = result
+        return MineUpgrade(mine=self._mine(kind, levels), vault=vault)
+
+    def _upgrade(
+        self, planet_id: UUID, user_id: UUID, kind: BuildingKind
+    ) -> tuple[dict[str, int], Vault] | None:
         """Lock the vault, store the production up to now, and pay for the upgrade.
 
-        Raises InsufficientResourcesError, and rolls back, if the vault has too
+        The production is stored with the old energy factor. Raises
+        InsufficientResourcesError, and rolls back, if the vault has too
         little. One transaction, so two upgrades at the same time cannot spend
-        the same resources (docs/adr/0111).
+        the same resources (docs/adr/0111, docs/adr/0112). Returns the levels
+        after the upgrade and the vault after the cost.
         """
         vault_row = self._repository.lock_vault(planet_id, user_id)
         if vault_row is None:
             return None
         levels = self._repository.get_building_levels(planet_id)
         level = levels.get(kind, 0)
-        game_speed = self._settings.game_speed
         vault = self._vault_from_row(vault_row, levels)
         cost = _upgrade_cost(kind, level)
         insufficient = (
@@ -150,24 +196,47 @@ class PlanetService:
         self._repository.commit()
 
         new_levels = {**levels, kind: level + 1}
-        mine = Mine(
-            kind=kind,
-            level=level + 1,
-            production_per_hour=_mine_production_per_hour(kind, level + 1, game_speed),
-            upgrade_cost=_upgrade_cost(kind, level + 1),
-        )
+        energy = _planet_energy(new_levels)
         new_vault = Vault(
             planet_id=planet_id,
             metal=metal,
             crystal=crystal,
             deuterium=deuterium,
-            production_per_hour=_vault_production_per_hour(new_levels, game_speed),
+            production_per_hour=_vault_production_per_hour(
+                new_levels, _energy_factor(energy), self._settings.game_speed
+            ),
+            energy=energy,
             calculated_at=self._now,
         )
-        return MineUpgrade(mine=mine, vault=new_vault)
+        return new_levels, new_vault
+
+    def _building(self, kind: BuildingKind, levels: dict[str, int]) -> Building:
+        level = levels.get(kind, 0)
+        factor = _energy_factor(_planet_energy(levels))
+        return Building(
+            kind=kind,
+            level=level,
+            production_per_hour=_mine_production_per_hour(
+                kind, level, factor, self._settings.game_speed
+            ),
+            energy=_building_energy(kind, level),
+            upgrade_cost=_upgrade_cost(kind, level),
+        )
+
+    def _mine(self, kind: MineKind, levels: dict[str, int]) -> Mine:
+        building = self._building(kind, levels)
+        return Mine(
+            kind=kind,
+            level=building.level,
+            production_per_hour=building.production_per_hour,
+            upgrade_cost=building.upgrade_cost,
+        )
 
     def _vault_from_row(self, row: StoredVault, levels: dict[str, int]) -> Vault:
-        production = _vault_production_per_hour(levels, self._settings.game_speed)
+        energy = _planet_energy(levels)
+        production = _vault_production_per_hour(
+            levels, _energy_factor(energy), self._settings.game_speed
+        )
         # A request can read its time, then wait for an upgrade that stores a
         # later time. Negative hours count as 0 (docs/adr/0111).
         hours = max(0.0, (self._now - row.updated_at).total_seconds() / 3600)
@@ -177,5 +246,6 @@ class PlanetService:
             crystal=_calculate_amount(row.crystal, production.crystal, hours),
             deuterium=_calculate_amount(row.deuterium, production.deuterium, hours),
             production_per_hour=production,
+            energy=energy,
             calculated_at=self._now,
         )
