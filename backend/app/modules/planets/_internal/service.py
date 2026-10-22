@@ -5,14 +5,10 @@ from uuid import UUID
 from app.modules.planets._internal.models import (
     BUILDING_ORDER,
     MAX_AMOUNT,
-    MINE_ORDER,
     Building,
     BuildingKind,
     BuildingUpgrade,
     Energy,
-    Mine,
-    MineKind,
-    MineUpgrade,
     Planet,
     Resources,
     StoredVault,
@@ -137,12 +133,6 @@ class PlanetService:
         levels = self._repository.get_building_levels(planet_id)
         return [self._building(kind, levels) for kind in BUILDING_ORDER]
 
-    def list_mines(self, planet_id: UUID, user_id: UUID) -> list[Mine] | None:
-        if not self._repository.planet_owned_by(planet_id, user_id):
-            return None
-        levels = self._repository.get_building_levels(planet_id)
-        return [self._mine(kind, levels) for kind in MINE_ORDER]
-
     def upgrade_building(
         self, planet_id: UUID, user_id: UUID, kind: BuildingKind
     ) -> BuildingUpgrade | None:
@@ -151,13 +141,6 @@ class PlanetService:
             return None
         levels, vault = result
         return BuildingUpgrade(building=self._building(kind, levels), vault=vault)
-
-    def upgrade_mine(self, planet_id: UUID, user_id: UUID, kind: MineKind) -> MineUpgrade | None:
-        result = self._upgrade(planet_id, user_id, kind)
-        if result is None:
-            return None
-        levels, vault = result
-        return MineUpgrade(mine=self._mine(kind, levels), vault=vault)
 
     def _upgrade(
         self, planet_id: UUID, user_id: UUID, kind: BuildingKind
@@ -221,15 +204,6 @@ class PlanetService:
             ),
             energy=_building_energy(kind, level),
             upgrade_cost=_upgrade_cost(kind, level),
-        )
-
-    def _mine(self, kind: MineKind, levels: dict[str, int]) -> Mine:
-        building = self._building(kind, levels)
-        return Mine(
-            kind=kind,
-            level=building.level,
-            production_per_hour=building.production_per_hour,
-            upgrade_cost=building.upgrade_cost,
         )
 
     def _vault_from_row(self, row: StoredVault, levels: dict[str, int]) -> Vault:

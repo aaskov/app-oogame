@@ -214,7 +214,7 @@ def test_read_vault_counts_no_production_for_a_clock_before_the_stored_time(
     assert (response.json()["metal"], response.json()["crystal"]) == (0, 0)
 
 
-def test_upgrade_mine_does_not_store_a_time_before_the_stored_time(session: Session) -> None:
+def test_upgrade_building_does_not_store_a_time_before_the_stored_time(session: Session) -> None:
     app, client = new_client(session)
     register_and_login(client, "ada@example.com")
     [planet] = client.get("/planets").json()
@@ -226,7 +226,7 @@ def test_upgrade_mine_does_not_store_a_time_before_the_stored_time(session: Sess
     session.commit()
     set_clock(app, stored_at - timedelta(minutes=1))
 
-    response = client.post(f"/planets/{planet_id}/mines/metal_mine/upgrade")
+    response = client.post(f"/planets/{planet_id}/buildings/metal_mine/upgrade")
 
     assert response.status_code == 200
     row = session.scalars(select(VaultRow).where(VaultRow.planet_id == planet_id)).one()
@@ -298,60 +298,11 @@ def test_read_vault_caps_the_amount_at_the_maximum(session: Session) -> None:
     assert response.json()["metal"] == MAX_AMOUNT
 
 
-# --- GET /planets/{planet_id}/mines ---------------------------------------------
+# --- GET /planets/{planet_id}/buildings and the upgrade -----------------------
+# The other buildings tests are in test_planets_buildings.py.
 
 
-def test_list_mines_returns_401_without_a_session(client: TestClient) -> None:
-    response = client.get("/planets/00000000-0000-0000-0000-000000000000/mines")
-
-    assert response.status_code == 401
-
-
-def test_list_mines_returns_404_for_an_unknown_planet(client: TestClient) -> None:
-    register_and_login(client, "ada@example.com")
-
-    response = client.get("/planets/00000000-0000-0000-0000-000000000000/mines")
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == NOT_FOUND
-
-
-def test_list_mines_returns_404_for_another_users_planet_with_the_same_detail(
-    client: TestClient,
-) -> None:
-    register_and_login(client, "ada@example.com")
-    [planet] = client.get("/planets").json()
-    unknown = client.get("/planets/00000000-0000-0000-0000-000000000000/mines")
-
-    register_and_login(client, "bob@example.com")
-    other_users = client.get(f"/planets/{planet['id']}/mines")
-
-    assert other_users.status_code == 404
-    assert other_users.json() == unknown.json()
-
-
-def test_list_mines_returns_the_three_mines_in_order_at_level_0(client: TestClient) -> None:
-    register_and_login(client, "ada@example.com")
-    [planet] = client.get("/planets").json()
-
-    response = client.get(f"/planets/{planet['id']}/mines")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert [mine["kind"] for mine in body] == [
-        "metal_mine",
-        "crystal_mine",
-        "deuterium_synthesizer",
-    ]
-    assert all(mine["level"] == 0 for mine in body)
-    assert all(mine["production_per_hour"] == 0 for mine in body)
-    metal_mine, crystal_mine, deuterium_synthesizer = body
-    assert metal_mine["upgrade_cost"] == {"metal": 60, "crystal": 15, "deuterium": 0}
-    assert crystal_mine["upgrade_cost"] == {"metal": 48, "crystal": 24, "deuterium": 0}
-    assert deuterium_synthesizer["upgrade_cost"] == {"metal": 225, "crystal": 75, "deuterium": 0}
-
-
-def test_list_mines_returns_the_production_and_the_cost_at_a_level(
+def test_list_buildings_returns_the_production_and_the_cost_at_a_level(
     client: TestClient, session: Session
 ) -> None:
     register_and_login(client, "ada@example.com")
@@ -359,7 +310,7 @@ def test_list_mines_returns_the_production_and_the_cost_at_a_level(
     set_building_level(session, UUID(planet["id"]), "metal_mine", 3)
     set_building_level(session, UUID(planet["id"]), "solar_plant", 2)
 
-    response = client.get(f"/planets/{planet['id']}/mines")
+    response = client.get(f"/planets/{planet['id']}/buildings")
 
     assert response.status_code == 200
     [metal_mine, *_] = response.json()
@@ -368,94 +319,22 @@ def test_list_mines_returns_the_production_and_the_cost_at_a_level(
     assert metal_mine["upgrade_cost"] == {"metal": 202, "crystal": 50, "deuterium": 0}
 
 
-# --- POST /planets/{planet_id}/mines/{mine}/upgrade -----------------------------
-
-
-def test_upgrade_mine_returns_401_without_a_session(client: TestClient) -> None:
-    response = client.post("/planets/00000000-0000-0000-0000-000000000000/mines/metal_mine/upgrade")
-
-    assert response.status_code == 401
-
-
-def test_upgrade_mine_returns_404_for_an_unknown_planet(client: TestClient) -> None:
-    register_and_login(client, "ada@example.com")
-
-    response = client.post("/planets/00000000-0000-0000-0000-000000000000/mines/metal_mine/upgrade")
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == NOT_FOUND
-
-
-def test_upgrade_mine_returns_404_for_another_users_planet_and_does_not_change_it(
-    client: TestClient, session: Session
-) -> None:
-    register_and_login(client, "ada@example.com")
-    [planet] = client.get("/planets").json()
-    before_vault = client.get(f"/planets/{planet['id']}/vault").json()
-    before_mines = client.get(f"/planets/{planet['id']}/mines").json()
-    unknown = client.post("/planets/00000000-0000-0000-0000-000000000000/mines/metal_mine/upgrade")
-
-    register_and_login(client, "bob@example.com")
-    other_users = client.post(f"/planets/{planet['id']}/mines/metal_mine/upgrade")
-
-    assert other_users.status_code == 404
-    assert other_users.json() == unknown.json()
-
-    register_and_login(client, "ada@example.com")
-    assert client.get(f"/planets/{planet['id']}/vault").json()["metal"] == before_vault["metal"]
-    assert client.get(f"/planets/{planet['id']}/mines").json() == before_mines
-
-
-def test_upgrade_mine_returns_422_for_an_unknown_mine_kind(client: TestClient) -> None:
+def test_upgrade_building_raises_the_level_and_subtracts_the_cost(client: TestClient) -> None:
     register_and_login(client, "ada@example.com")
     [planet] = client.get("/planets").json()
 
-    response = client.post(f"/planets/{planet['id']}/mines/solar_satellite/upgrade")
-
-    assert response.status_code == 422
-
-
-def test_upgrade_mine_raises_the_level_and_subtracts_the_cost(client: TestClient) -> None:
-    register_and_login(client, "ada@example.com")
-    [planet] = client.get("/planets").json()
-
-    response = client.post(f"/planets/{planet['id']}/mines/metal_mine/upgrade")
+    response = client.post(f"/planets/{planet['id']}/buildings/metal_mine/upgrade")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["mine"]["kind"] == "metal_mine"
-    assert body["mine"]["level"] == 1
+    assert body["building"]["kind"] == "metal_mine"
+    assert body["building"]["level"] == 1
     assert body["vault"]["metal"] == START_METAL - 60
     assert body["vault"]["crystal"] == START_CRYSTAL - 15
     assert body["vault"]["deuterium"] == START_DEUTERIUM
 
-    mines = client.get(f"/planets/{planet['id']}/mines").json()
-    assert mines[0]["level"] == 1
+    buildings = client.get(f"/planets/{planet['id']}/buildings").json()
+    assert buildings[0]["level"] == 1
     vault = client.get(f"/planets/{planet['id']}/vault").json()
     assert vault["metal"] == START_METAL - 60
     assert vault["crystal"] == START_CRYSTAL - 15
-
-
-def test_upgrade_mine_returns_409_when_the_vault_has_too_little(
-    client: TestClient, session: Session
-) -> None:
-    register_and_login(client, "ada@example.com")
-    [planet] = client.get("/planets").json()
-    planet_id = UUID(planet["id"])
-    session.execute(
-        update(VaultRow)
-        .where(VaultRow.planet_id == planet_id)
-        .values(metal=0, crystal=0, deuterium=0)
-    )
-    session.commit()
-
-    response = client.post(f"/planets/{planet_id}/mines/metal_mine/upgrade")
-
-    assert response.status_code == 409
-    assert "detail" in response.json()
-
-    vault = client.get(f"/planets/{planet_id}/vault").json()
-    assert vault["metal"] == 0
-    assert vault["crystal"] == 0
-    mines = client.get(f"/planets/{planet_id}/mines").json()
-    assert mines[0]["level"] == 0

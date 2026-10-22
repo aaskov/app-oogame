@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field
 MAX_AMOUNT = 9007199254740991  # 2^53 - 1, the largest integer JavaScript holds exactly.
 
 Amount = Annotated[int, Field(ge=0, le=MAX_AMOUNT)]
-MineKind = Literal["metal_mine", "crystal_mine", "deuterium_synthesizer"]
 BuildingKind = Literal["metal_mine", "crystal_mine", "deuterium_synthesizer", "solar_plant"]
 
 
@@ -43,22 +42,6 @@ class VaultOut(BaseModel):
     production_per_hour: ResourcesOut
     energy: EnergyOut
     calculated_at: datetime
-
-
-class MineOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    kind: MineKind
-    level: int = Field(ge=0)
-    production_per_hour: Amount
-    upgrade_cost: ResourcesOut
-
-
-class MineUpgradeOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    mine: MineOut
-    vault: VaultOut
 
 
 class BuildingOut(BaseModel):

@@ -5,11 +5,14 @@ from uuid import UUID
 
 MAX_AMOUNT = 9007199254740991  # 2^53 - 1, the largest integer JavaScript holds exactly.
 
-MineKind = Literal["metal_mine", "crystal_mine", "deuterium_synthesizer"]
 BuildingKind = Literal["metal_mine", "crystal_mine", "deuterium_synthesizer", "solar_plant"]
 # The order of the contract (docs/adr/0111, docs/adr/0112).
-MINE_ORDER: tuple[MineKind, ...] = ("metal_mine", "crystal_mine", "deuterium_synthesizer")
-BUILDING_ORDER: tuple[BuildingKind, ...] = (*MINE_ORDER, "solar_plant")
+BUILDING_ORDER: tuple[BuildingKind, ...] = (
+    "metal_mine",
+    "crystal_mine",
+    "deuterium_synthesizer",
+    "solar_plant",
+)
 
 
 @dataclass(frozen=True)
@@ -51,20 +54,6 @@ class Vault:
     production_per_hour: Resources
     energy: Energy
     calculated_at: datetime
-
-
-@dataclass(frozen=True)
-class Mine:
-    kind: MineKind
-    level: int
-    production_per_hour: int
-    upgrade_cost: Resources
-
-
-@dataclass(frozen=True)
-class MineUpgrade:
-    mine: Mine
-    vault: Vault
 
 
 @dataclass(frozen=True)

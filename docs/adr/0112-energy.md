@@ -62,6 +62,9 @@ So the change goes in two steps:
    architect removes `list_mines`, `upgrade_mine`, `Mine`, `MineKind`, and
    `MineUpgrade` from the contract and the backend.
 
+Both steps are done. The expand step is in #39 and #40. The agents did the
+work in #43 and #44. The contract step is in contract 0.6.0.
+
 ## Consequences
 
 - A new player who upgrades a mine before the solar plant gets only the base
