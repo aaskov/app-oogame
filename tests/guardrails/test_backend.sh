@@ -21,7 +21,15 @@ fresh() {
   tar -C "$repo" --exclude=.venv --exclude=__pycache__ --exclude=.pytest_cache \
     --exclude=.ruff_cache -cf - backend contracts | tar -C "$root" -xf -
 }
-slot() { SEED_ROOT="$root" "$checks/$1"; }
+# The copy gets its own database (guardrails_test), so that its tests and the
+# gate's own check:test, which run at the same time, never share rows.
+slot() {
+  if [ -n "${DATABASE_URL:-}" ]; then
+    SEED_ROOT="$root" DATABASE_URL="${DATABASE_URL%/*}/guardrails" "$checks/$1"
+  else
+    SEED_ROOT="$root" "$checks/$1"
+  fi
+}
 
 # A second module, so that the boundary contracts have something to compare.
 alpha_module() {

@@ -12,6 +12,7 @@ from app.shared.config import get_settings
 from app.shared.db import get_session
 from app.shared.orm.buildings import BuildingRow
 from app.shared.orm.planets import PlanetRow
+from app.shared.orm.users import UserRow
 from app.shared.orm.vaults import START_CRYSTAL, START_DEUTERIUM, START_METAL, VaultRow
 
 NOT_FOUND = "Planet not found"
@@ -37,6 +38,13 @@ def set_clock(app: FastAPI, when: datetime) -> None:
 def set_game_speed(app: FastAPI, game_speed: float) -> None:
     settings = get_settings().model_copy(update={"game_speed": game_speed})
     app.dependency_overrides[get_settings] = lambda: settings
+
+
+def planets_of(email: str):
+    # Other test runs can commit rows at the same time. Read only this user's rows.
+    return select(PlanetRow).join(UserRow, UserRow.id == PlanetRow.user_id).where(
+        UserRow.email == email
+    )
 
 
 def set_building_level(session: Session, planet_id: UUID, kind: str, level: int) -> None:
@@ -72,7 +80,7 @@ def test_list_planets_creates_the_home_vault_with_the_start_values(
 
     client.get("/planets")
 
-    row = session.scalars(select(PlanetRow)).one()
+    row = session.scalars(planets_of("ada@example.com")).one()
     assert row.is_home is True
     vault = client.get(f"/planets/{row.id}/vault").json()
     assert vault["metal"] == START_METAL
@@ -89,7 +97,7 @@ def test_list_planets_two_first_calls_create_exactly_one_home_planet(
     second = client.get("/planets").json()
 
     assert first == second
-    rows = session.scalars(select(PlanetRow)).all()
+    rows = session.scalars(planets_of("ada@example.com")).all()
     assert len(rows) == 1
     assert rows[0].is_home is True
 
@@ -97,7 +105,7 @@ def test_list_planets_two_first_calls_create_exactly_one_home_planet(
 def test_list_planets_returns_planets_oldest_first(client: TestClient, session: Session) -> None:
     register_and_login(client, "ada@example.com")
     client.get("/planets")
-    home = session.scalars(select(PlanetRow)).one()
+    home = session.scalars(planets_of("ada@example.com")).one()
     other = PlanetRow(user_id=home.user_id, name="Colony", is_home=False)
     session.add(other)
     session.commit()
@@ -179,6 +187,50 @@ def test_read_vault_at_level_0_after_two_hours(session: Session) -> None:
     assert body["deuterium"] == START_DEUTERIUM
     assert body["production_per_hour"] == {"metal": 30, "crystal": 15, "deuterium": 0}
     assert datetime.fromisoformat(body["calculated_at"]) == base_time + timedelta(hours=2)
+
+
+def test_read_vault_counts_no_production_for_a_clock_before_the_stored_time(
+    session: Session,
+) -> None:
+    # A request can read its time, then wait for an upgrade that stores a later
+    # time (docs/adr/0111). Negative hours must count as 0, not below 0.
+    app, client = new_client(session)
+    register_and_login(client, "ada@example.com")
+    [planet] = client.get("/planets").json()
+    planet_id = UUID(planet["id"])
+    stored_at = datetime(2026, 1, 1, tzinfo=UTC)
+    session.execute(
+        update(VaultRow)
+        .where(VaultRow.planet_id == planet_id)
+        .values(metal=0, crystal=0, deuterium=0, updated_at=stored_at)
+    )
+    session.commit()
+    set_clock(app, stored_at - timedelta(minutes=1))
+
+    response = client.get(f"/planets/{planet_id}/vault")
+
+    assert response.status_code == 200
+    assert (response.json()["metal"], response.json()["crystal"]) == (0, 0)
+
+
+def test_upgrade_mine_does_not_store_a_time_before_the_stored_time(session: Session) -> None:
+    app, client = new_client(session)
+    register_and_login(client, "ada@example.com")
+    [planet] = client.get("/planets").json()
+    planet_id = UUID(planet["id"])
+    stored_at = datetime(2026, 1, 1, tzinfo=UTC)
+    session.execute(
+        update(VaultRow).where(VaultRow.planet_id == planet_id).values(updated_at=stored_at)
+    )
+    session.commit()
+    set_clock(app, stored_at - timedelta(minutes=1))
+
+    response = client.post(f"/planets/{planet_id}/mines/metal_mine/upgrade")
+
+    assert response.status_code == 200
+    row = session.scalars(select(VaultRow).where(VaultRow.planet_id == planet_id)).one()
+    session.refresh(row)
+    assert row.updated_at == stored_at
 
 
 def test_read_vault_at_level_3_after_two_hours(session: Session) -> None:

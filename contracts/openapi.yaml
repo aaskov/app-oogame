@@ -132,7 +132,6 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: read_vault
-      x-planned: true
       summary: Return the vault of one planet of the logged-in user, with its production.
       description: |
         The amounts are calculated at calculated_at: the stored amounts plus the
@@ -161,7 +160,6 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: list_mines
-      x-planned: true
       summary: List the three mines of one planet of the logged-in user.
       description: |
         Always three mines, in the order metal_mine, crystal_mine,
@@ -192,7 +190,6 @@ paths:
       - $ref: "#/components/parameters/MineKind"
     post:
       operationId: upgrade_mine
-      x-planned: true
       summary: Upgrade one mine by one level. It costs resources from the vault.
       description: |
         The upgrade is instant. The server first adds the production up to now,

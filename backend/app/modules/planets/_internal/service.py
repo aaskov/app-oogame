@@ -143,7 +143,9 @@ class PlanetService:
         metal = vault.metal - cost.metal
         crystal = vault.crystal - cost.crystal
         deuterium = vault.deuterium - cost.deuterium
-        self._repository.update_vault_amounts(planet_id, metal, crystal, deuterium, self._now)
+        # Never store a time before the stored time (docs/adr/0111).
+        stored_at = max(self._now, vault_row.updated_at)
+        self._repository.update_vault_amounts(planet_id, metal, crystal, deuterium, stored_at)
         self._repository.set_building_level(planet_id, kind, level + 1)
         self._repository.commit()
 
@@ -166,7 +168,9 @@ class PlanetService:
 
     def _vault_from_row(self, row: StoredVault, levels: dict[str, int]) -> Vault:
         production = _vault_production_per_hour(levels, self._settings.game_speed)
-        hours = (self._now - row.updated_at).total_seconds() / 3600
+        # A request can read its time, then wait for an upgrade that stores a
+        # later time. Negative hours count as 0 (docs/adr/0111).
+        hours = max(0.0, (self._now - row.updated_at).total_seconds() / 3600)
         return Vault(
             planet_id=row.planet_id,
             metal=_calculate_amount(row.metal, production.metal, hours),

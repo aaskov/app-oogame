@@ -239,7 +239,7 @@ def test_me_returns_401_if_sub_is_not_a_user_id(client: TestClient) -> None:
 def test_me_returns_401_for_a_deleted_user(client: TestClient, session: Session) -> None:
     register(client)
     login(client)
-    session.delete(session.scalars(select(UserRow)).one())
+    session.delete(session.scalars(select(UserRow).where(UserRow.email == EMAIL)).one())
     session.flush()
 
     assert client.get("/auth/me").status_code == 401
