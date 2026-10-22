@@ -124,7 +124,8 @@ export interface paths {
          * Return the vault of one planet of the logged-in user, with its production.
          * @description The amounts are calculated at calculated_at: the stored amounts plus the
          *     production since the last change (docs/adr/0111). A client can count up
-         *     from calculated_at with production_per_hour.
+         *     from calculated_at with production_per_hour. The production includes the
+         *     energy factor (docs/adr/0112).
          */
         get: operations["read_vault"];
         put?: never;
@@ -148,6 +149,8 @@ export interface paths {
          * List the three mines of one planet of the logged-in user.
          * @description Always three mines, in the order metal_mine, crystal_mine,
          *     deuterium_synthesizer. A mine that was never upgraded has level 0.
+         *     Replaced by list_buildings. The architect removes it after the
+         *     frontend uses list_buildings (docs/adr/0112).
          */
         get: operations["list_mines"];
         put?: never;
@@ -175,8 +178,60 @@ export interface paths {
          * @description The upgrade is instant. The server first adds the production up to now,
          *     then subtracts the cost and raises the level, in one transaction. Two
          *     upgrades at the same time cannot spend the same resources (docs/adr/0111).
+         *     Replaced by upgrade_building. The architect removes it after the
+         *     frontend uses upgrade_building (docs/adr/0112).
          */
         post: operations["upgrade_mine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planets/{planet_id}/buildings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List the four buildings of one planet of the logged-in user.
+         * @description Always four buildings, in the order metal_mine, crystal_mine,
+         *     deuterium_synthesizer, solar_plant. A building that was never upgraded
+         *     has level 0 (docs/adr/0112).
+         */
+        get: operations["list_buildings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planets/{planet_id}/buildings/{kind}/upgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+                kind: components["parameters"]["BuildingKind"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upgrade one building by one level. It costs resources from the vault.
+         * @description The upgrade is instant. The server first adds the production up to now,
+         *     then subtracts the cost and raises the level, in one transaction. Two
+         *     upgrades at the same time cannot spend the same resources. An upgrade
+         *     that makes the energy too low is allowed (docs/adr/0112).
+         */
+        post: operations["upgrade_building"];
         delete?: never;
         options?: never;
         head?: never;
@@ -214,6 +269,8 @@ export interface components {
             crystal: components["schemas"]["Amount"];
             deuterium: components["schemas"]["Amount"];
             production_per_hour: components["schemas"]["Resources"];
+            /** @description The energy of the whole planet. */
+            energy: components["schemas"]["Energy"];
             /** Format: date-time */
             calculated_at: string;
         };
@@ -234,6 +291,37 @@ export interface components {
         };
         MineUpgrade: {
             mine: components["schemas"]["Mine"];
+            vault: components["schemas"]["Vault"];
+        };
+        /** @enum {string} */
+        BuildingKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer" | "solar_plant";
+        /**
+         * @description Energy is not stored and does not count up. If used is more than
+         *     produced, each mine produces only produced / used of its production
+         *     (docs/adr/0112).
+         */
+        Energy: {
+            produced: number;
+            used: number;
+        };
+        Building: {
+            kind: components["schemas"]["BuildingKind"];
+            level: number;
+            /**
+             * @description What this building adds per hour, at its level, after the energy
+             *     factor and without the base income. 0 for the solar plant.
+             */
+            production_per_hour: components["schemas"]["Amount"];
+            /**
+             * @description What this building produces and uses, at its level. A mine has
+             *     produced 0. The solar plant has used 0.
+             */
+            energy: components["schemas"]["Energy"];
+            /** @description The cost of the next level. */
+            upgrade_cost: components["schemas"]["Resources"];
+        };
+        BuildingUpgrade: {
+            building: components["schemas"]["Building"];
             vault: components["schemas"]["Vault"];
         };
         /**
@@ -263,6 +351,7 @@ export interface components {
     parameters: {
         PlanetId: string;
         MineKind: components["schemas"]["MineKind"];
+        BuildingKind: components["schemas"]["BuildingKind"];
     };
     requestBodies: never;
     headers: never;
@@ -567,6 +656,94 @@ export interface operations {
                 };
             };
             /** @description The planet ID is not a UUID, or the mine is not one of the three kinds. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_buildings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The buildings of the planet. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Building"][];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["PlanetNotFound"];
+            /** @description The planet ID is not a UUID. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upgrade_building: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+                kind: components["parameters"]["BuildingKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The building after the upgrade, and the vault after the cost. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuildingUpgrade"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["PlanetNotFound"];
+            /** @description The vault has too little for the upgrade cost. Nothing changes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The planet ID is not a UUID, or the kind is not one of the four building kinds. */
             422: {
                 headers: {
                     [name: string]: unknown;

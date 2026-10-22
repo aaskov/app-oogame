@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.4.0
+  version: 0.5.0
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -132,11 +132,13 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: read_vault
+      x-planned: true
       summary: Return the vault of one planet of the logged-in user, with its production.
       description: |
         The amounts are calculated at calculated_at: the stored amounts plus the
         production since the last change (docs/adr/0111). A client can count up
-        from calculated_at with production_per_hour.
+        from calculated_at with production_per_hour. The production includes the
+        energy factor (docs/adr/0112).
       responses:
         "200":
           description: The vault of the planet.
@@ -164,6 +166,8 @@ paths:
       description: |
         Always three mines, in the order metal_mine, crystal_mine,
         deuterium_synthesizer. A mine that was never upgraded has level 0.
+        Replaced by list_buildings. The architect removes it after the
+        frontend uses list_buildings (docs/adr/0112).
       responses:
         "200":
           description: The mines of the planet.
@@ -190,11 +194,14 @@ paths:
       - $ref: "#/components/parameters/MineKind"
     post:
       operationId: upgrade_mine
+      x-planned: true
       summary: Upgrade one mine by one level. It costs resources from the vault.
       description: |
         The upgrade is instant. The server first adds the production up to now,
         then subtracts the cost and raises the level, in one transaction. Two
         upgrades at the same time cannot spend the same resources (docs/adr/0111).
+        Replaced by upgrade_building. The architect removes it after the
+        frontend uses upgrade_building (docs/adr/0112).
       responses:
         "200":
           description: The mine after the upgrade, and the vault after the cost.
@@ -219,6 +226,74 @@ paths:
         "422":
           description: The planet ID is not a UUID, or the mine is not one of the three kinds.
 
+  /planets/{planet_id}/buildings:
+    parameters:
+      - $ref: "#/components/parameters/PlanetId"
+    get:
+      operationId: list_buildings
+      x-planned: true
+      summary: List the four buildings of one planet of the logged-in user.
+      description: |
+        Always four buildings, in the order metal_mine, crystal_mine,
+        deuterium_synthesizer, solar_plant. A building that was never upgraded
+        has level 0 (docs/adr/0112).
+      responses:
+        "200":
+          description: The buildings of the planet.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Building"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/PlanetNotFound"
+        "422":
+          description: The planet ID is not a UUID.
+
+  /planets/{planet_id}/buildings/{kind}/upgrade:
+    parameters:
+      - $ref: "#/components/parameters/PlanetId"
+      - $ref: "#/components/parameters/BuildingKind"
+    post:
+      operationId: upgrade_building
+      x-planned: true
+      summary: Upgrade one building by one level. It costs resources from the vault.
+      description: |
+        The upgrade is instant. The server first adds the production up to now,
+        then subtracts the cost and raises the level, in one transaction. Two
+        upgrades at the same time cannot spend the same resources. An upgrade
+        that makes the energy too low is allowed (docs/adr/0112).
+      responses:
+        "200":
+          description: The building after the upgrade, and the vault after the cost.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildingUpgrade"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/PlanetNotFound"
+        "409":
+          description: The vault has too little for the upgrade cost. Nothing changes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: The planet ID is not a UUID, or the kind is not one of the four building kinds.
+
 components:
   parameters:
     PlanetId:
@@ -235,6 +310,13 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/MineKind"
+
+    BuildingKind:
+      name: kind
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/BuildingKind"
 
   responses:
     PlanetNotFound:
@@ -293,7 +375,7 @@ components:
 
     Vault:
       type: object
-      required: [planet_id, metal, crystal, deuterium, production_per_hour, calculated_at]
+      required: [planet_id, metal, crystal, deuterium, production_per_hour, energy, calculated_at]
       properties:
         planet_id:
           type: string
@@ -306,6 +388,9 @@ components:
           $ref: "#/components/schemas/Amount"
         production_per_hour:
           $ref: "#/components/schemas/Resources"
+        energy:
+          description: The energy of the whole planet.
+          $ref: "#/components/schemas/Energy"
         calculated_at:
           type: string
           format: date-time
@@ -347,6 +432,57 @@ components:
       properties:
         mine:
           $ref: "#/components/schemas/Mine"
+        vault:
+          $ref: "#/components/schemas/Vault"
+
+    BuildingKind:
+      type: string
+      enum: [metal_mine, crystal_mine, deuterium_synthesizer, solar_plant]
+
+    Energy:
+      description: |
+        Energy is not stored and does not count up. If used is more than
+        produced, each mine produces only produced / used of its production
+        (docs/adr/0112).
+      type: object
+      required: [produced, used]
+      properties:
+        produced:
+          type: integer
+          minimum: 0
+        used:
+          type: integer
+          minimum: 0
+
+    Building:
+      type: object
+      required: [kind, level, production_per_hour, energy, upgrade_cost]
+      properties:
+        kind:
+          $ref: "#/components/schemas/BuildingKind"
+        level:
+          type: integer
+          minimum: 0
+        production_per_hour:
+          description: |
+            What this building adds per hour, at its level, after the energy
+            factor and without the base income. 0 for the solar plant.
+          $ref: "#/components/schemas/Amount"
+        energy:
+          description: |
+            What this building produces and uses, at its level. A mine has
+            produced 0. The solar plant has used 0.
+          $ref: "#/components/schemas/Energy"
+        upgrade_cost:
+          description: The cost of the next level.
+          $ref: "#/components/schemas/Resources"
+
+    BuildingUpgrade:
+      type: object
+      required: [building, vault]
+      properties:
+        building:
+          $ref: "#/components/schemas/Building"
         vault:
           $ref: "#/components/schemas/Vault"
 
