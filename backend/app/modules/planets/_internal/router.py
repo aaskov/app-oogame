@@ -5,8 +5,19 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.modules.auth.public_api import get_current_user_id
 from app.modules.planets._internal.dependencies import get_planet_service
-from app.modules.planets._internal.models import Mine, MineKind, MineUpgrade, Planet, Vault
+from app.modules.planets._internal.models import (
+    Building,
+    BuildingKind,
+    BuildingUpgrade,
+    Mine,
+    MineKind,
+    MineUpgrade,
+    Planet,
+    Vault,
+)
 from app.modules.planets._internal.schemas import (
+    BuildingOut,
+    BuildingUpgradeOut,
     ErrorOut,
     MineOut,
     MineUpgradeOut,
@@ -44,6 +55,42 @@ def read_vault(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> Vaul
     if vault is None:
         raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
     return vault
+
+
+@router.get(
+    "/{planet_id}/buildings",
+    operation_id="list_buildings",
+    response_model=list[BuildingOut],
+    responses={401: {"model": ErrorOut}, 404: {"model": ErrorOut}, 422: {}},
+)
+def list_buildings(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> list[Building]:
+    buildings = service.list_buildings(planet_id, user_id)
+    if buildings is None:
+        raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
+    return buildings
+
+
+@router.post(
+    "/{planet_id}/buildings/{kind}/upgrade",
+    operation_id="upgrade_building",
+    response_model=BuildingUpgradeOut,
+    responses={
+        401: {"model": ErrorOut},
+        404: {"model": ErrorOut},
+        409: {"model": ErrorOut},
+        422: {},
+    },
+)
+def upgrade_building(
+    planet_id: UUID, kind: BuildingKind, user_id: UserIdDep, service: ServiceDep
+) -> BuildingUpgrade:
+    try:
+        result = service.upgrade_building(planet_id, user_id, kind)
+    except InsufficientResourcesError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    if result is None:
+        raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
+    return result
 
 
 @router.get(
