@@ -12,6 +12,7 @@ from app.shared.config import get_settings
 from app.shared.db import get_session
 from app.shared.orm.buildings import BuildingRow
 from app.shared.orm.planets import PlanetRow
+from app.shared.orm.users import UserRow
 from app.shared.orm.vaults import START_CRYSTAL, START_DEUTERIUM, START_METAL, VaultRow
 
 NOT_FOUND = "Planet not found"
@@ -37,6 +38,13 @@ def set_clock(app: FastAPI, when: datetime) -> None:
 def set_game_speed(app: FastAPI, game_speed: float) -> None:
     settings = get_settings().model_copy(update={"game_speed": game_speed})
     app.dependency_overrides[get_settings] = lambda: settings
+
+
+def planets_of(email: str):
+    # Other test runs can commit rows at the same time. Read only this user's rows.
+    return select(PlanetRow).join(UserRow, UserRow.id == PlanetRow.user_id).where(
+        UserRow.email == email
+    )
 
 
 def set_building_level(session: Session, planet_id: UUID, kind: str, level: int) -> None:
@@ -72,7 +80,7 @@ def test_list_planets_creates_the_home_vault_with_the_start_values(
 
     client.get("/planets")
 
-    row = session.scalars(select(PlanetRow)).one()
+    row = session.scalars(planets_of("ada@example.com")).one()
     assert row.is_home is True
     vault = client.get(f"/planets/{row.id}/vault").json()
     assert vault["metal"] == START_METAL
@@ -89,7 +97,7 @@ def test_list_planets_two_first_calls_create_exactly_one_home_planet(
     second = client.get("/planets").json()
 
     assert first == second
-    rows = session.scalars(select(PlanetRow)).all()
+    rows = session.scalars(planets_of("ada@example.com")).all()
     assert len(rows) == 1
     assert rows[0].is_home is True
 
@@ -97,7 +105,7 @@ def test_list_planets_two_first_calls_create_exactly_one_home_planet(
 def test_list_planets_returns_planets_oldest_first(client: TestClient, session: Session) -> None:
     register_and_login(client, "ada@example.com")
     client.get("/planets")
-    home = session.scalars(select(PlanetRow)).one()
+    home = session.scalars(planets_of("ada@example.com")).one()
     other = PlanetRow(user_id=home.user_id, name="Colony", is_home=False)
     session.add(other)
     session.commit()

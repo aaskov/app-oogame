@@ -34,7 +34,9 @@ def pytest_configure(config: pytest.Config) -> None:
     test_name = name if name.endswith("_test") else f"{name}_test"
     os.environ["DATABASE_URL"] = f"{server_url}/{test_name}"
 
-    with psycopg.connect(development_url, autocommit=True) as admin:
+    # Connect to the standard postgres database, so that the base name in
+    # DATABASE_URL does not have to exist (tests/guardrails uses its own name).
+    with psycopg.connect(f"{server_url}/postgres", autocommit=True) as admin:
         admin.execute("select pg_advisory_lock(%s)", (SETUP_LOCK,))
         try:
             exists = admin.execute(
