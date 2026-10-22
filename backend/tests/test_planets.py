@@ -181,6 +181,50 @@ def test_read_vault_at_level_0_after_two_hours(session: Session) -> None:
     assert datetime.fromisoformat(body["calculated_at"]) == base_time + timedelta(hours=2)
 
 
+def test_read_vault_counts_no_production_for_a_clock_before_the_stored_time(
+    session: Session,
+) -> None:
+    # A request can read its time, then wait for an upgrade that stores a later
+    # time (docs/adr/0111). Negative hours must count as 0, not below 0.
+    app, client = new_client(session)
+    register_and_login(client, "ada@example.com")
+    [planet] = client.get("/planets").json()
+    planet_id = UUID(planet["id"])
+    stored_at = datetime(2026, 1, 1, tzinfo=UTC)
+    session.execute(
+        update(VaultRow)
+        .where(VaultRow.planet_id == planet_id)
+        .values(metal=0, crystal=0, deuterium=0, updated_at=stored_at)
+    )
+    session.commit()
+    set_clock(app, stored_at - timedelta(minutes=1))
+
+    response = client.get(f"/planets/{planet_id}/vault")
+
+    assert response.status_code == 200
+    assert (response.json()["metal"], response.json()["crystal"]) == (0, 0)
+
+
+def test_upgrade_mine_does_not_store_a_time_before_the_stored_time(session: Session) -> None:
+    app, client = new_client(session)
+    register_and_login(client, "ada@example.com")
+    [planet] = client.get("/planets").json()
+    planet_id = UUID(planet["id"])
+    stored_at = datetime(2026, 1, 1, tzinfo=UTC)
+    session.execute(
+        update(VaultRow).where(VaultRow.planet_id == planet_id).values(updated_at=stored_at)
+    )
+    session.commit()
+    set_clock(app, stored_at - timedelta(minutes=1))
+
+    response = client.post(f"/planets/{planet_id}/mines/metal_mine/upgrade")
+
+    assert response.status_code == 200
+    row = session.scalars(select(VaultRow).where(VaultRow.planet_id == planet_id)).one()
+    session.refresh(row)
+    assert row.updated_at == stored_at
+
+
 def test_read_vault_at_level_3_after_two_hours(session: Session) -> None:
     app, client = new_client(session)
     register_and_login(client, "ada@example.com")

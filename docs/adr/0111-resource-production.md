@@ -20,6 +20,8 @@ resources, and the user spends resources to upgrade a mine.
   the stored amounts. A read returns, for each resource:
   `floor(stored + production_per_hour × hours since updated_at)`, at most 2^53 − 1.
   A write first stores that value, with `updated_at` set to the same time.
+  A request reads its time before it waits for the lock. So hours below 0
+  count as 0, and a write never stores a time before the stored `updated_at`.
 - **Production per hour**, at level L, multiplied by `GAME_SPEED` and rounded down:
 
   | Mine | Mine production | Base income of each planet |
