@@ -15,6 +15,7 @@ export type Credentials = components["schemas"]["Credentials"];
 export type Planet = components["schemas"]["Planet"];
 export type Vault = components["schemas"]["Vault"];
 export type Resources = components["schemas"]["Resources"];
+export type Amount = components["schemas"]["Amount"];
 export type BuildingKind = components["schemas"]["BuildingKind"];
 export type Building = components["schemas"]["Building"];
 export type BuildingUpgrade = components["schemas"]["BuildingUpgrade"];

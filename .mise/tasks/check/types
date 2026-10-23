@@ -12,3 +12,16 @@ if has_frontend; then
   # Next.js generates its route types (LayoutProps, PageProps) into .next/types.
   (cd "$stack_target/frontend" && node_tool next typegen >/dev/null && node_tool tsc --noEmit --incremental false) || exit 1
 fi
+
+# A comment that silences a checker is allowed only in a guarded path, so only
+# the architect can add one. An agent follows "When you are blocked" instead.
+silenced=0
+while IFS=: read -r file line _; do
+  if ! is_guarded "$file"; then
+    echo "check:types: $file:$line silences a checker. Only a guarded path can do that." >&2
+    silenced=1
+  fi
+done < <(cd "$stack_target" && find backend/app backend/tests backend/migrations frontend/src \
+  -type f \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' \) 2>/dev/null |
+  xargs grep -nE 'pyright: *ignore|type: *ignore|@ts-ignore|@ts-expect-error|@ts-nocheck|eslint-disable' || true)
+exit "$silenced"

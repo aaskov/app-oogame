@@ -19,7 +19,7 @@ f="$root/frontend"
 fresh() {
   rm -rf "$root" && mkdir -p "$root"
   tar -C "$repo" --exclude=node_modules --exclude=.next --exclude='*.tsbuildinfo' \
-    -cf - frontend contracts | tar -C "$root" -xf -
+    -cf - frontend contracts .github/CODEOWNERS | tar -C "$root" -xf -
   ln -s "$repo/frontend/node_modules" "$f/node_modules"
 }
 slot() { SEED_ROOT="$root" "$checks/$1"; }
@@ -76,5 +76,12 @@ expect 1 "check:contracts fails when src/types/api.ts is older than the contract
 
 fresh; printf '\nexport type Seeded = string;\n' >>"$f/src/types/api.ts"
 expect 1 "check:contracts fails on a manual change to src/types/api.ts" slot contracts
+
+# Lesson 17: each contract schema has an export in src/lib/api.ts.
+fresh; sed -i '/^export type Energy = /d' "$f/src/lib/api.ts"
+expect 1 "check:contracts fails when src/lib/api.ts does not export a schema" slot contracts
+
+fresh; printf '// @ts-expect-error seeded\nexport const seeded: number = "text";\n' >"$f/src/seeded.ts"
+expect 1 "check:types fails on a @ts-expect-error outside a guarded path" slot types
 
 guardrails_result test_frontend

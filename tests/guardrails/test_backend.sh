@@ -19,7 +19,7 @@ b="$root/backend"
 fresh() {
   rm -rf "$root" && mkdir -p "$root"
   tar -C "$repo" --exclude=.venv --exclude=__pycache__ --exclude=.pytest_cache \
-    --exclude=.ruff_cache -cf - backend contracts | tar -C "$root" -xf -
+    --exclude=.ruff_cache -cf - backend contracts .github/CODEOWNERS | tar -C "$root" -xf -
 }
 # The copy gets its own database (guardrails_test), so that its tests and the
 # gate's own check:test, which run at the same time, never share rows.
@@ -57,6 +57,12 @@ expect 1 "check:lint fails on a bare noqa comment" slot lint
 
 fresh; printf 'value: int = "text"\n' >"$b/app/seeded.py"
 expect 1 "check:types fails on a type error" slot types
+
+fresh; printf 'value: int = "text"  # pyright: ignore[reportAssignmentType]\n' >"$b/app/seeded.py"
+expect 1 "check:types fails on a pyright ignore outside a guarded path" slot types
+
+fresh; printf 'value: int = "text"  # pyright: ignore[reportAssignmentType]\n' >"$b/app/shared/seeded.py"
+expect 0 "check:types allows a pyright ignore in a guarded path" slot types
 
 fresh; printf 'value: int = "text"  # type: ignore\n' >"$b/app/seeded.py"
 expect 1 "check:types does not accept a type: ignore comment" slot types
@@ -108,6 +114,13 @@ expect 0 "check:contracts allows a missing operation that is x-planned" slot con
 fresh; sed -i 's/^    password: Annotated\[str, StringConstraints(min_length=8, max_length=128)\]$/    password: Annotated[str, StringConstraints(min_length=8, max_length=128)] | None = None/' \
   "$b/app/modules/auth/_internal/schemas.py"
 expect 1 "check:contracts fails when the backend accepts null for a contract field" slot contracts
+
+# Lesson 20: the check does not compare a planned operation, but null still fails.
+fresh; sed -i 's/^      operationId: list_buildings$/      operationId: list_buildings\n      x-planned: true/; s/^      operationId: upgrade_building$/      operationId: upgrade_building\n      x-planned: true/' \
+  "$root/contracts/openapi.yaml"
+sed -i 's/upgrade_finishes_at: datetime | SkipJsonSchema\[None\] = None/upgrade_finishes_at: datetime | None = None/' \
+  "$b/app/modules/planets/_internal/schemas.py"
+expect 1 "check:contracts fails on null in a planned operation" slot contracts
 
 fresh; sed -i 's/min_length=8, max_length=128/max_length=128/' "$b/app/modules/auth/_internal/schemas.py"
 expect 1 "check:contracts fails when the backend lacks a contract constraint" slot contracts
