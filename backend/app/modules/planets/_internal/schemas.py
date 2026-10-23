@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 
 MAX_AMOUNT = 9007199254740991  # 2^53 - 1, the largest integer JavaScript holds exactly.
 
@@ -61,7 +62,8 @@ class BuildingOut(BaseModel):
     production_per_hour: Amount
     energy: EnergyOut
     upgrade_cost: ResourcesOut
-    upgrade_finishes_at: datetime | None = None
+    # Absent, not null, without a running upgrade (docs/adr/0110, docs/adr/0114).
+    upgrade_finishes_at: datetime | SkipJsonSchema[None] = None
 
 
 class BuildingUpgradeOut(BaseModel):

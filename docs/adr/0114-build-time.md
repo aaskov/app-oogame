@@ -42,7 +42,8 @@ planet builds one building at a time.
 ## Consequences
 
 - `list_buildings` and `upgrade_building` are `x-planned` in the prep, because
-  their responses changed. The cleanup removes the flags.
+  their responses changed. The cleanup removes the flags (done after #56
+  and #57).
 - A read of the vault or the buildings can write. It takes the vault lock only
   when an upgrade is due.
 - No new schema, so `frontend/src/lib/api.ts` needs no new export (lesson 17).
