@@ -46,6 +46,27 @@ export const buildings: Building[] = [
     energy: { produced: 22, used: 0 },
     upgrade_cost: { metal: 1_125, crystal: 45, deuterium: 0 },
   },
+  {
+    kind: "metal_storage",
+    level: 0,
+    production_per_hour: 0,
+    energy: { produced: 0, used: 0 },
+    upgrade_cost: { metal: 1000, crystal: 0, deuterium: 0 },
+  },
+  {
+    kind: "crystal_storage",
+    level: 0,
+    production_per_hour: 0,
+    energy: { produced: 0, used: 0 },
+    upgrade_cost: { metal: 1000, crystal: 500, deuterium: 0 },
+  },
+  {
+    kind: "deuterium_tank",
+    level: 0,
+    production_per_hour: 0,
+    energy: { produced: 0, used: 0 },
+    upgrade_cost: { metal: 1000, crystal: 1000, deuterium: 0 },
+  },
 ];
 
 // The metal mine goes to level 2. The energy used rises from 22 to 35, so the
@@ -75,6 +96,9 @@ export const buildingsAfterUpgrade: Building[] = [
   { ...buildings[1], production_per_hour: 13 },
   buildings[2],
   buildings[3],
+  buildings[4],
+  buildings[5],
+  buildings[6],
 ];
 
 export function fakeFetch(routes: Record<string, Route>, seen: Request[] = []) {

@@ -108,7 +108,11 @@ export function BuildingsView({
       <ul className="flex flex-col gap-3">
         {buildings.map((building) => {
           const name = BUILDING_NAMES[building.kind];
-          const isMine = building.kind !== "solar_plant";
+          const isStorage =
+            building.kind === "metal_storage" ||
+            building.kind === "crystal_storage" ||
+            building.kind === "deuterium_tank";
+          const isMine = !isStorage && building.kind !== "solar_plant";
           const affordable = canAfford(amounts, building.upgrade_cost);
           return (
             <li
@@ -122,7 +126,7 @@ export function BuildingsView({
                     ? `Level ${building.level} · +${format(building.production_per_hour)}/h`
                     : `Level ${building.level}`}
                 </p>
-                <p className="text-sm text-zinc-500">{energyText(building.energy)}</p>
+                {!isStorage && <p className="text-sm text-zinc-500">{energyText(building.energy)}</p>}
                 <p className="text-sm text-zinc-500">{costText(building.upgrade_cost)}</p>
               </div>
               <button

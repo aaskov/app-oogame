@@ -62,7 +62,7 @@ describe("PlanetsPage", () => {
     expect(
       screen.getByRole("button", { name: "Homeworld" }).getAttribute("aria-pressed"),
     ).toBe("true");
-    expect((await screen.findByText("Metal")).nextElementSibling?.textContent).toBe("500");
+    expect((await screen.findByText("Metal")).nextElementSibling?.textContent).toBe("500 / 10,000");
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -83,7 +83,7 @@ describe("PlanetsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Colony" }));
 
     await waitFor(() =>
-      expect(screen.getByText("Metal").nextElementSibling?.textContent).toBe("42"),
+      expect(screen.getByText("Metal").nextElementSibling?.textContent).toBe("42 / 10,000"),
     );
   });
 
@@ -127,7 +127,7 @@ describe("PlanetsPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Upgrade Metal mine" }));
 
-    await waitFor(() => expect(screen.getByText("Metal").nextElementSibling?.textContent).toBe("410"));
+    await waitFor(() => expect(screen.getByText("Metal").nextElementSibling?.textContent).toBe("410 / 10,000"));
     expect(screen.getByText("Energy: 22 / 35")).toBeTruthy();
     expect(screen.getByText("Energy is too low. Mines produce 62 %.")).toBeTruthy();
     await waitFor(() => expect(screen.getByText("Level 1 · +13/h")).toBeTruthy());

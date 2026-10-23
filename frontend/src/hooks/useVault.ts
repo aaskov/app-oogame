@@ -10,12 +10,16 @@ export type Amounts = { metal: number; crystal: number; deuterium: number };
 
 function amountsAt(vault: Vault, now: number): Amounts {
   const hoursSinceCalculated = (now - Date.parse(vault.calculated_at)) / (1000 * 60 * 60);
+  const capAt = (stored: number, production: number, capacity: number) => {
+    if (stored >= capacity) {
+      return stored;
+    }
+    return Math.min(capacity, Math.floor(stored + production * hoursSinceCalculated));
+  };
   return {
-    metal: Math.floor(vault.metal + vault.production_per_hour.metal * hoursSinceCalculated),
-    crystal: Math.floor(vault.crystal + vault.production_per_hour.crystal * hoursSinceCalculated),
-    deuterium: Math.floor(
-      vault.deuterium + vault.production_per_hour.deuterium * hoursSinceCalculated,
-    ),
+    metal: capAt(vault.metal, vault.production_per_hour.metal, vault.capacity.metal),
+    crystal: capAt(vault.crystal, vault.production_per_hour.crystal, vault.capacity.crystal),
+    deuterium: capAt(vault.deuterium, vault.production_per_hour.deuterium, vault.capacity.deuterium),
   };
 }
 

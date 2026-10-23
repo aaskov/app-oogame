@@ -13,7 +13,7 @@ describe("VaultView", () => {
     expect(screen.queryByRole("region", { name: "Vault" })).toBeNull();
   });
 
-  it("shows the metal, crystal, and deuterium amounts with thousands separators", () => {
+  it("shows the metal, crystal, and deuterium amounts as amount / capacity", () => {
     render(
       <VaultView
         vault={vault}
@@ -23,9 +23,9 @@ describe("VaultView", () => {
       />,
     );
 
-    expect(screen.getByText("1,500,000")).toBeTruthy();
-    expect(screen.getByText("2,000")).toBeTruthy();
-    expect(screen.getAllByText("0").length).toBeGreaterThan(0);
+    expect(screen.getByText("1,500,000 / 10,000")).toBeTruthy();
+    expect(screen.getByText("2,000 / 10,000")).toBeTruthy();
+    expect(screen.getByText("0 / 10,000")).toBeTruthy();
   });
 
   it("shows the production per hour next to each amount", () => {
@@ -89,5 +89,47 @@ describe("VaultView", () => {
     render(<VaultView vault={null} amounts={null} loading={false} error={404} />);
 
     expect(screen.getByRole("alert").textContent).toBe("This planet was not found.");
+  });
+
+  it("shows 'Full' mark when a resource reaches its capacity", () => {
+    render(
+      <VaultView
+        vault={vault}
+        amounts={{ metal: 10_000, crystal: 5000, deuterium: 0 }}
+        loading={false}
+        error={null}
+      />,
+    );
+
+    const metalFull = screen.getAllByText("Full");
+    expect(metalFull.length).toBeGreaterThan(0);
+  });
+
+  it("shows 'Full' mark when a resource is above capacity", () => {
+    render(
+      <VaultView
+        vault={vault}
+        amounts={{ metal: 15_000, crystal: 5000, deuterium: 0 }}
+        loading={false}
+        error={null}
+      />,
+    );
+
+    const fullMarks = screen.getAllByText("Full");
+    expect(fullMarks.length).toBeGreaterThan(0);
+    expect(screen.getByText("15,000 / 10,000")).toBeTruthy();
+  });
+
+  it("does not show 'Full' mark when a resource is below capacity", () => {
+    render(
+      <VaultView
+        vault={vault}
+        amounts={{ metal: 5000, crystal: 5000, deuterium: 0 }}
+        loading={false}
+        error={null}
+      />,
+    );
+
+    expect(screen.queryByText("Full")).toBeNull();
   });
 });
