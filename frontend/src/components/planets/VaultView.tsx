@@ -41,15 +41,23 @@ export function VaultView({
   return (
     <section aria-label="Vault" className="flex flex-col gap-6">
       <dl className="grid grid-cols-3 gap-4 text-center">
-        {LABELS.map(({ key, label }) => (
-          <div key={key}>
-            <dt className="text-sm text-zinc-500">{label}</dt>
-            <dd className="text-lg font-semibold">{amounts[key].toLocaleString("en-US")}</dd>
-            <dd className="text-xs text-zinc-400">
-              +{vault.production_per_hour[key].toLocaleString("en-US")}/h
-            </dd>
-          </div>
-        ))}
+        {LABELS.map(({ key, label }) => {
+          const amount = amounts[key];
+          const capacity = vault.capacity[key];
+          const isFull = amount >= capacity;
+          return (
+            <div key={key}>
+              <dt className="text-sm text-zinc-500">{label}</dt>
+              <dd className="text-lg font-semibold">
+                {amount.toLocaleString("en-US")} / {capacity.toLocaleString("en-US")}
+              </dd>
+              {isFull && <dd className="text-xs font-medium text-amber-600">Full</dd>}
+              <dd className="text-xs text-zinc-400">
+                +{vault.production_per_hour[key].toLocaleString("en-US")}/h
+              </dd>
+            </div>
+          );
+        })}
       </dl>
       <div className="text-center text-sm">
         <p>

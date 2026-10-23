@@ -53,14 +53,22 @@ describe("BuildingsView", () => {
     expect(screen.queryByRole("region", { name: "Buildings" })).toBeNull();
   });
 
-  it("lists the four buildings in order with their names", async () => {
+  it("lists the seven buildings in order with their names", async () => {
     renderView({ [listRoute]: { status: 200, body: buildings } });
 
     const region = await screen.findByRole("region", { name: "Buildings" });
     const names = within(region)
       .getAllByRole("listitem")
       .map((item) => within(item).getAllByText(/./)[0].textContent);
-    expect(names).toEqual(["Metal mine", "Crystal mine", "Deuterium synthesizer", "Solar plant"]);
+    expect(names).toEqual([
+      "Metal mine",
+      "Crystal mine",
+      "Deuterium synthesizer",
+      "Solar plant",
+      "Metal storage",
+      "Crystal storage",
+      "Deuterium tank",
+    ]);
   });
 
   it("shows the level and the production per hour of a mine", async () => {
@@ -202,5 +210,27 @@ describe("BuildingsView", () => {
     await screen.findByText("Metal mine");
 
     expect(dateNow).not.toHaveBeenCalled();
+  });
+
+  it("shows storage buildings with no production and no energy line", async () => {
+    renderView({ [listRoute]: { status: 200, body: buildings } });
+    await screen.findByText("Metal storage");
+
+    expect(row("Metal storage").getByText("Level 0")).toBeTruthy();
+    expect(row("Metal storage").queryByText(/\/h/)).toBeNull();
+    expect(row("Metal storage").queryByText(/energy/)).toBeNull();
+    expect(row("Crystal storage").queryByText(/\/h/)).toBeNull();
+    expect(row("Crystal storage").queryByText(/energy/)).toBeNull();
+    expect(row("Deuterium tank").queryByText(/\/h/)).toBeNull();
+    expect(row("Deuterium tank").queryByText(/energy/)).toBeNull();
+  });
+
+  it("shows storage building upgrade costs", async () => {
+    renderView({ [listRoute]: { status: 200, body: buildings } });
+    await screen.findByText("Metal storage");
+
+    expect(row("Metal storage").getByText("Cost: 1,000 metal, 0 crystal")).toBeTruthy();
+    expect(row("Crystal storage").getByText("Cost: 1,000 metal, 500 crystal")).toBeTruthy();
+    expect(row("Deuterium tank").getByText("Cost: 1,000 metal, 1,000 crystal")).toBeTruthy();
   });
 });

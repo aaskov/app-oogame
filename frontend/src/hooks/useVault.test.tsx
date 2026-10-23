@@ -131,4 +131,42 @@ describe("useVault", () => {
 
     expect(result.current.amounts).toEqual({ metal: 10, crystal: 500, deuterium: 0 });
   });
+
+  it("stops counting up at capacity", async () => {
+    const client = createApi(
+      fakeFetch({ [`GET /planets/${planetId}/vault`]: { status: 200, body: vault } }),
+    );
+    const { result } = renderHook(() => useVault(planetId, client));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.amounts).toEqual({ metal: 500, crystal: 500, deuterium: 0 });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9500000);
+    });
+
+    expect(result.current.amounts?.metal).toBeLessThanOrEqual(10000);
+    expect(result.current.amounts?.metal).toEqual(10000);
+  });
+
+  it("keeps an amount above capacity as is, not growing", async () => {
+    const vaultAboveCapacity = {
+      ...vault,
+      metal: 15000,
+      capacity: { metal: 10000, crystal: 10000, deuterium: 10000 },
+    };
+    const client = createApi(
+      fakeFetch({ [`GET /planets/${planetId}/vault`]: { status: 200, body: vaultAboveCapacity } }),
+    );
+    const { result } = renderHook(() => useVault(planetId, client));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.amounts?.metal).toEqual(15000);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(result.current.amounts?.metal).toEqual(15000);
+  });
 });
