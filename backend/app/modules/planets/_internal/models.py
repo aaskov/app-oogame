@@ -69,12 +69,21 @@ class Vault:
 
 
 @dataclass(frozen=True)
+class Construction:
+    """The one running upgrade of a planet (docs/adr/0114)."""
+
+    kind: str
+    finishes_at: datetime
+
+
+@dataclass(frozen=True)
 class Building:
     kind: BuildingKind
     level: int
     production_per_hour: int
     energy: Energy
     upgrade_cost: Resources
+    upgrade_finishes_at: datetime | None = None
 
 
 @dataclass(frozen=True)

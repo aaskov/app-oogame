@@ -243,7 +243,8 @@ def test_upgrade_storage_stores_production_with_old_capacity(session: Session) -
     planet_id = home_planet(client)
     # Start with 9990 metal at capacity 10000, then upgrade to capacity 20000
     set_vault(
-        session, planet_id,
+        session,
+        planet_id,
         metal=9990,
         crystal=START_CRYSTAL,
         deuterium=START_DEUTERIUM,
@@ -259,8 +260,9 @@ def test_upgrade_storage_stores_production_with_old_capacity(session: Session) -
     # Production with old capacity (10000) for 1 hour: min(10000, floor(9990 + 30)) = 10000
     # Then subtract the cost: 10000 - 1000 = 9000
     assert body["vault"]["metal"] == 9000
-    assert body["vault"]["capacity"]["metal"] == 20000
-    assert body["building"]["level"] == 1
+    # The level and the capacity change when the upgrade finishes (docs/adr/0114).
+    assert body["vault"]["capacity"]["metal"] == 10000
+    assert body["building"]["level"] == 0
 
 
 def test_metal_is_full_at_capacity_upgrade_storage_1_hour_later_is_full_minus_cost_plus_production(
@@ -269,7 +271,8 @@ def test_metal_is_full_at_capacity_upgrade_storage_1_hour_later_is_full_minus_co
     app, client = new_client(session)
     planet_id = home_planet(client)
     set_vault(
-        session, planet_id,
+        session,
+        planet_id,
         metal=10000,
         crystal=START_CRYSTAL,
         deuterium=START_DEUTERIUM,

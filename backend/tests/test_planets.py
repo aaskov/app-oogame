@@ -42,8 +42,10 @@ def set_game_speed(app: FastAPI, game_speed: float) -> None:
 
 def planets_of(email: str):
     # Other test runs can commit rows at the same time. Read only this user's rows.
-    return select(PlanetRow).join(UserRow, UserRow.id == PlanetRow.user_id).where(
-        UserRow.email == email
+    return (
+        select(PlanetRow)
+        .join(UserRow, UserRow.id == PlanetRow.user_id)
+        .where(UserRow.email == email)
     )
 
 
@@ -322,22 +324,36 @@ def test_list_buildings_returns_the_production_and_the_cost_at_a_level(
     assert metal_mine["upgrade_cost"] == {"metal": 202, "crystal": 50, "deuterium": 0}
 
 
-def test_upgrade_building_raises_the_level_and_subtracts_the_cost(client: TestClient) -> None:
+def test_upgrade_building_subtracts_the_cost_and_raises_the_level_when_it_finishes(
+    session: Session,
+) -> None:
+    app, client = new_client(session)
     register_and_login(client, "ada@example.com")
     [planet] = client.get("/planets").json()
+    session.execute(
+        update(VaultRow)
+        .where(VaultRow.planet_id == UUID(planet["id"]))
+        .values(updated_at=datetime(2026, 1, 1, tzinfo=UTC))
+    )
+    session.commit()
+    set_clock(app, datetime(2026, 1, 1, tzinfo=UTC))
 
     response = client.post(f"/planets/{planet['id']}/buildings/metal_mine/upgrade")
 
     assert response.status_code == 200
     body = response.json()
     assert body["building"]["kind"] == "metal_mine"
-    assert body["building"]["level"] == 1
+    assert body["building"]["level"] == 0
     assert body["vault"]["metal"] == START_METAL - 60
     assert body["vault"]["crystal"] == START_CRYSTAL - 15
     assert body["vault"]["deuterium"] == START_DEUTERIUM
 
     buildings = client.get(f"/planets/{planet['id']}/buildings").json()
-    assert buildings[0]["level"] == 1
+    assert buildings[0]["level"] == 0
     vault = client.get(f"/planets/{planet['id']}/vault").json()
     assert vault["metal"] == START_METAL - 60
     assert vault["crystal"] == START_CRYSTAL - 15
+
+    set_clock(app, datetime(2026, 1, 1, tzinfo=UTC) + timedelta(seconds=108))
+    buildings = client.get(f"/planets/{planet['id']}/buildings").json()
+    assert buildings[0]["level"] == 1

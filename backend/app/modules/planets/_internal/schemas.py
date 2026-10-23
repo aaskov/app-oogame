@@ -61,6 +61,7 @@ class BuildingOut(BaseModel):
     production_per_hour: Amount
     energy: EnergyOut
     upgrade_cost: ResourcesOut
+    upgrade_finishes_at: datetime | None = None
 
 
 class BuildingUpgradeOut(BaseModel):

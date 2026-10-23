@@ -22,6 +22,7 @@ from app.modules.planets._internal.models import StoredVault
 from app.modules.planets._internal.repository import PlanetRepository
 from app.shared.db import get_engine, get_session
 from app.shared.orm.buildings import BuildingRow
+from app.shared.orm.constructions import ConstructionRow
 from app.shared.orm.planets import PlanetRow
 from app.shared.orm.users import UserRow
 from app.shared.orm.vaults import VaultRow
@@ -93,8 +94,10 @@ def test_two_building_upgrades_at_the_same_time_only_one_succeeds(
             assert vault.metal == 0
             assert vault.crystal == 0
             building = check.get(BuildingRow, (planet_id, "solar_plant"))
-            assert building is not None
-            assert building.level == 1
+            assert building is None
+            construction = check.get(ConstructionRow, planet_id)
+            assert construction is not None
+            assert construction.kind == "solar_plant"
         finally:
             check.close()
     finally:
