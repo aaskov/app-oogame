@@ -1,5 +1,5 @@
 # Changes here will be overwritten by Copier. Do not edit by hand.
-_commit: v0.3.1
+_commit: v0.3.2
 _src_path: git@github.com-personal:aaskov/agentic-seed.git
 bot_app_id: '5360592'
 bot_app_slug: aaskov-agent-bot

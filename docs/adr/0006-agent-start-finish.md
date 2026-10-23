@@ -28,7 +28,12 @@ used these tasks for two features (auth and planets) before they moved here.
 - **The model:** an agent uses `claude-sonnet-5-5`. `AGENT_MODEL=<model>`
   overrides it for one start. The seed sets no model in `.claude/settings.json`,
   so a session in the main checkout (the architect) keeps the Claude default.
-- `AGENT_START_NO_CLAUDE=1` prints the model and the prompt in place of starting Claude.
+- **The permission mode:** an agent runs in `auto` mode, so it does not ask
+  before each command. `AGENT_PERMISSION_MODE=<mode>` overrides it for one
+  start, for example `default`. The guard hook, the Stop gate, `check:guarded`,
+  and the rulesets stay active in each mode. The seed sets no mode in
+  `.claude/settings.json`, so an architect session keeps its own mode.
+- `AGENT_START_NO_CLAUDE=1` prints the model, the mode, and the prompt in place of starting Claude.
 
 ## Consequences
 
