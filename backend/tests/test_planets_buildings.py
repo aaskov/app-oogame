@@ -19,7 +19,15 @@ from tests.test_planets import (
 
 UNKNOWN_PLANET = "00000000-0000-0000-0000-000000000000"
 BASE_TIME = datetime(2026, 1, 1, tzinfo=UTC)
-BUILDING_ORDER = ["metal_mine", "crystal_mine", "deuterium_synthesizer", "solar_plant"]
+BUILDING_ORDER = [
+    "metal_mine",
+    "crystal_mine",
+    "deuterium_synthesizer",
+    "solar_plant",
+    "metal_storage",
+    "crystal_storage",
+    "deuterium_tank",
+]
 
 
 def home_planet(client: TestClient, email: str = "ada@example.com") -> UUID:
@@ -164,6 +172,7 @@ def test_list_buildings_returns_the_four_buildings_in_order_at_level_0(
 
     assert response.status_code == 200
     body = response.json()
+    assert len(body) == 7
     assert [building["kind"] for building in body] == BUILDING_ORDER
     assert all(building["level"] == 0 for building in body)
     assert all(building["production_per_hour"] == 0 for building in body)
@@ -173,6 +182,9 @@ def test_list_buildings_returns_the_four_buildings_in_order_at_level_0(
         {"metal": 48, "crystal": 24, "deuterium": 0},
         {"metal": 225, "crystal": 75, "deuterium": 0},
         {"metal": 75, "crystal": 30, "deuterium": 0},
+        {"metal": 1000, "crystal": 0, "deuterium": 0},
+        {"metal": 1000, "crystal": 500, "deuterium": 0},
+        {"metal": 1000, "crystal": 1000, "deuterium": 0},
     ]
 
 
@@ -185,7 +197,15 @@ def test_list_buildings_returns_the_energy_and_the_cost_at_a_level(
 
     body = client.get(f"/planets/{planet_id}/buildings").json()
 
-    metal_mine, crystal_mine, deuterium_synthesizer, solar_plant = body
+    (
+        metal_mine,
+        crystal_mine,
+        deuterium_synthesizer,
+        solar_plant,
+        metal_storage,
+        crystal_storage,
+        deuterium_tank,
+    ) = body
     assert metal_mine["energy"] == {"produced": 0, "used": 39}
     assert crystal_mine["energy"] == {"produced": 0, "used": 39}
     assert deuterium_synthesizer["energy"] == {"produced": 0, "used": 79}
@@ -195,6 +215,16 @@ def test_list_buildings_returns_the_energy_and_the_cost_at_a_level(
     # Energy 79 for a use of 157: factor 79/157. Metal: floor(119.79 * 79/157).
     assert metal_mine["production_per_hour"] == 60
     assert metal_mine["upgrade_cost"] == {"metal": 202, "crystal": 50, "deuterium": 0}
+    # Storage buildings have no production or energy
+    assert metal_storage["production_per_hour"] == 0
+    assert metal_storage["energy"] == {"produced": 0, "used": 0}
+    assert metal_storage["upgrade_cost"] == {"metal": 8000, "crystal": 0, "deuterium": 0}
+    assert crystal_storage["production_per_hour"] == 0
+    assert crystal_storage["energy"] == {"produced": 0, "used": 0}
+    assert crystal_storage["upgrade_cost"] == {"metal": 8000, "crystal": 4000, "deuterium": 0}
+    assert deuterium_tank["production_per_hour"] == 0
+    assert deuterium_tank["energy"] == {"produced": 0, "used": 0}
+    assert deuterium_tank["upgrade_cost"] == {"metal": 8000, "crystal": 8000, "deuterium": 0}
 
 
 # --- POST /planets/{planet_id}/buildings/{kind}/upgrade ---------------------------------

@@ -181,6 +181,7 @@ def test_read_vault_at_level_0_after_two_hours(session: Session) -> None:
         "deuterium",
         "production_per_hour",
         "energy",
+        "capacity",
         "calculated_at",
     }
     assert body["metal"] == START_METAL + 60
@@ -284,18 +285,20 @@ def test_read_vault_caps_the_amount_at_the_maximum(session: Session) -> None:
     [planet] = client.get("/planets").json()
     planet_id = UUID(planet["id"])
     base_time = datetime(2026, 1, 1, tzinfo=UTC)
+    # Start at capacity 10000 and produce for 1000 hours. This would exceed MAX_AMOUNT.
     session.execute(
         update(VaultRow)
         .where(VaultRow.planet_id == planet_id)
-        .values(metal=MAX_AMOUNT - 10, updated_at=base_time)
+        .values(metal=MAX_AMOUNT - 100, updated_at=base_time)
     )
     session.commit()
-    set_clock(app, base_time + timedelta(hours=1000))
+    set_clock(app, base_time + timedelta(hours=1))
 
     response = client.get(f"/planets/{planet_id}/vault")
 
     assert response.status_code == 200
-    assert response.json()["metal"] == MAX_AMOUNT
+    # Already above capacity 10000, so amount stays the same (docs/adr/0113)
+    assert response.json()["metal"] == MAX_AMOUNT - 100
 
 
 # --- GET /planets/{planet_id}/buildings and the upgrade -----------------------
