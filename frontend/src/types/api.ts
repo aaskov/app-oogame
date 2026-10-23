@@ -174,11 +174,13 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Upgrade one building by one level. It costs resources from the vault.
-         * @description The upgrade is instant. The server first adds the production up to now,
-         *     then subtracts the cost and raises the level, in one transaction. Two
-         *     upgrades at the same time cannot spend the same resources. An upgrade
-         *     that makes the energy too low is allowed (docs/adr/0112).
+         * Start the upgrade of one building by one level. It costs resources from the vault.
+         * @description The server first completes an upgrade that is due and adds the
+         *     production up to now. Then it subtracts the cost and starts the
+         *     upgrade, in one transaction. The level goes up at upgrade_finishes_at
+         *     (docs/adr/0114). A planet has at most one running upgrade. Two upgrades
+         *     at the same time cannot spend the same resources. An upgrade that
+         *     makes the energy too low is allowed (docs/adr/0112).
          */
         post: operations["upgrade_building"];
         delete?: never;
@@ -259,6 +261,12 @@ export interface components {
             energy: components["schemas"]["Energy"];
             /** @description The cost of the next level. */
             upgrade_cost: components["schemas"]["Resources"];
+            /**
+             * Format: date-time
+             * @description Only on the building with the running upgrade. At this time, the
+             *     level goes up by one (docs/adr/0114).
+             */
+            upgrade_finishes_at?: string;
         };
         BuildingUpgrade: {
             building: components["schemas"]["Building"];
@@ -566,7 +574,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The building after the upgrade, and the vault after the cost. */
+            /** @description The building with its upgrade_finishes_at, and the vault after the cost. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -585,7 +593,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["PlanetNotFound"];
-            /** @description The vault has too little for the upgrade cost. Nothing changes. */
+            /** @description The vault has too little for the upgrade cost, or an upgrade runs on the planet. Nothing changes. */
             409: {
                 headers: {
                     [name: string]: unknown;
