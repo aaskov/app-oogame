@@ -1,12 +1,13 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, text, update
+from sqlalchemy import delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.modules.planets._internal.models import Planet, StoredVault
+from app.modules.planets._internal.models import Construction, Planet, StoredVault
 from app.shared.orm.buildings import BuildingRow
+from app.shared.orm.constructions import ConstructionRow
 from app.shared.orm.planets import HOME_PLANET_NAME, PlanetRow
 from app.shared.orm.vaults import START_CRYSTAL, START_DEUTERIUM, START_METAL, VaultRow
 
@@ -113,6 +114,22 @@ class PlanetRepository:
             )
         )
         self._session.execute(statement)
+
+    def get_construction(self, planet_id: UUID) -> Construction | None:
+        # populate_existing: after the vault lock, read what the other request committed.
+        row = self._session.scalars(
+            select(ConstructionRow)
+            .where(ConstructionRow.planet_id == planet_id)
+            .execution_options(populate_existing=True)
+        ).one_or_none()
+        return Construction(kind=row.kind, finishes_at=row.finishes_at) if row else None
+
+    def add_construction(self, planet_id: UUID, kind: str, finishes_at: datetime) -> None:
+        self._session.add(ConstructionRow(planet_id=planet_id, kind=kind, finishes_at=finishes_at))
+        self._session.flush()
+
+    def delete_construction(self, planet_id: UUID) -> None:
+        self._session.execute(delete(ConstructionRow).where(ConstructionRow.planet_id == planet_id))
 
     def commit(self) -> None:
         self._session.commit()

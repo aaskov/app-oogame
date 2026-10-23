@@ -274,60 +274,82 @@ def test_upgrade_building_by_another_user_returns_404_and_changes_nothing(
     assert client.get(f"/planets/{planet_id}/buildings").json() == before_buildings
 
 
-def test_upgrade_building_solar_plant_raises_the_level_and_the_energy(
-    client: TestClient,
+def test_upgrade_building_solar_plant_raises_the_level_and_the_energy_when_it_finishes(
+    session: Session,
 ) -> None:
+    app, client = new_client(session)
     planet_id = home_planet(client)
+    set_vault(session, planet_id, updated_at=BASE_TIME)
+    set_clock(app, BASE_TIME)
 
     response = client.post(f"/planets/{planet_id}/buildings/solar_plant/upgrade")
 
     assert response.status_code == 200
     body = response.json()
     assert body["building"]["kind"] == "solar_plant"
-    assert body["building"]["level"] == 1
-    assert body["building"]["energy"] == {"produced": 22, "used": 0}
+    assert body["building"]["level"] == 0
+    assert body["building"]["energy"] == {"produced": 0, "used": 0}
     assert body["building"]["production_per_hour"] == 0
-    assert body["building"]["upgrade_cost"] == {"metal": 112, "crystal": 45, "deuterium": 0}
+    assert body["building"]["upgrade_cost"] == {"metal": 75, "crystal": 30, "deuterium": 0}
     assert body["vault"]["metal"] == START_METAL - 75
     assert body["vault"]["crystal"] == START_CRYSTAL - 30
     assert body["vault"]["deuterium"] == START_DEUTERIUM
-    assert body["vault"]["energy"] == {"produced": 22, "used": 0}
+    assert body["vault"]["energy"] == {"produced": 0, "used": 0}
 
-    buildings = client.get(f"/planets/{planet_id}/buildings").json()
-    assert buildings[3]["level"] == 1
+    # 3600 * (75 + 30) / 2500 = 151.2 seconds
+    set_clock(app, BASE_TIME + timedelta(seconds=151))
+    assert client.get(f"/planets/{planet_id}/buildings").json()[3]["level"] == 1
     vault = client.get(f"/planets/{planet_id}/vault").json()
     assert vault["energy"] == {"produced": 22, "used": 0}
 
 
-def test_upgrade_building_returns_the_mine_with_the_factor_after_the_upgrade(
-    client: TestClient, session: Session
-) -> None:
+def test_upgrade_building_returns_the_mine_at_its_old_level(session: Session) -> None:
+    app, client = new_client(session)
     planet_id = home_planet(client)
     set_building_level(session, planet_id, "solar_plant", 1)
     set_building_level(session, planet_id, "metal_mine", 1)
-
-    response = client.post(f"/planets/{planet_id}/buildings/metal_mine/upgrade")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["building"]["level"] == 2
-    assert body["building"]["energy"] == {"produced": 0, "used": 24}
-    assert body["building"]["production_per_hour"] == 66
-    assert body["vault"]["energy"] == {"produced": 22, "used": 24}
-    assert body["vault"]["production_per_hour"]["metal"] == 30 + 66
-
-
-def test_upgrade_building_that_makes_the_energy_too_low_is_allowed(client: TestClient) -> None:
-    planet_id = home_planet(client)
+    set_vault(session, planet_id, updated_at=BASE_TIME)
+    set_clock(app, BASE_TIME)
 
     response = client.post(f"/planets/{planet_id}/buildings/metal_mine/upgrade")
 
     assert response.status_code == 200
     body = response.json()
     assert body["building"]["level"] == 1
-    assert body["building"]["production_per_hour"] == 0
-    assert body["vault"]["energy"] == {"produced": 0, "used": 11}
-    assert body["vault"]["production_per_hour"]["metal"] == 30
+    assert body["building"]["energy"] == {"produced": 0, "used": 11}
+    assert body["building"]["production_per_hour"] == 33
+    assert body["vault"]["energy"] == {"produced": 22, "used": 11}
+    assert body["vault"]["production_per_hour"]["metal"] == 30 + 33
+
+    # 3600 * (90 + 22) / 2500 = 161.28 seconds. Then level 2 uses 24 of 22 energy.
+    set_clock(app, BASE_TIME + timedelta(seconds=161))
+    done = client.get(f"/planets/{planet_id}/buildings").json()[0]
+    assert done["level"] == 2
+    assert done["energy"] == {"produced": 0, "used": 24}
+    assert done["production_per_hour"] == 66
+    vault = client.get(f"/planets/{planet_id}/vault").json()
+    assert vault["energy"] == {"produced": 22, "used": 24}
+    assert vault["production_per_hour"]["metal"] == 30 + 66
+
+
+def test_upgrade_building_that_makes_the_energy_too_low_is_allowed(session: Session) -> None:
+    app, client = new_client(session)
+    planet_id = home_planet(client)
+    set_vault(session, planet_id, updated_at=BASE_TIME)
+    set_clock(app, BASE_TIME)
+
+    response = client.post(f"/planets/{planet_id}/buildings/metal_mine/upgrade")
+
+    assert response.status_code == 200
+    assert response.json()["building"]["level"] == 0
+
+    set_clock(app, BASE_TIME + timedelta(seconds=108))
+    done = client.get(f"/planets/{planet_id}/buildings").json()[0]
+    assert done["level"] == 1
+    assert done["production_per_hour"] == 0
+    vault = client.get(f"/planets/{planet_id}/vault").json()
+    assert vault["energy"] == {"produced": 0, "used": 11}
+    assert vault["production_per_hour"]["metal"] == 30
 
 
 def test_upgrade_building_returns_409_when_the_vault_has_too_little(
@@ -355,7 +377,7 @@ def test_upgrade_building_stores_the_production_with_the_old_factor(session: Ses
     set_building_level(session, planet_id, "metal_mine", 1)
     set_vault(session, planet_id, metal=1000, crystal=1000, deuterium=0, updated_at=BASE_TIME)
 
-    # 2 hours at factor 1, then metal mine 2 uses 24 and the factor is 22/24.
+    # 2 hours at factor 1, then the upgrade starts.
     set_clock(app, BASE_TIME + timedelta(hours=2))
     upgrade = client.post(f"/planets/{planet_id}/buildings/metal_mine/upgrade")
 
@@ -363,9 +385,12 @@ def test_upgrade_building_stores_the_production_with_the_old_factor(session: Ses
     assert upgrade.json()["vault"]["metal"] == 1000 + 2 * 63 - 90
     assert upgrade.json()["vault"]["crystal"] == 1000 + 2 * 15 - 22
 
-    # 1 more hour at the new production: 30 base + 66 from the mine.
+    # The upgrade takes 161 seconds. Level 2 uses 24 energy, so the factor is 22/24:
+    # 30 base + 66 from the mine. Until the finish time, the old production counts.
     set_clock(app, BASE_TIME + timedelta(hours=3))
     vault = client.get(f"/planets/{planet_id}/vault").json()
 
-    assert vault["metal"] == 1000 + 2 * 63 - 90 + 1 * 96
-    assert vault["crystal"] == 1000 + 2 * 15 - 22 + 1 * 15
+    metal_at_finish = 1000 + 2 * 63 - 90 + 161 * 63 // 3600
+    crystal_at_finish = 1000 + 2 * 15 - 22 + 161 * 15 // 3600
+    assert vault["metal"] == metal_at_finish + (3600 - 161) * 96 // 3600
+    assert vault["crystal"] == crystal_at_finish + (3600 - 161) * 15 // 3600

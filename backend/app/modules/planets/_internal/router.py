@@ -19,7 +19,11 @@ from app.modules.planets._internal.schemas import (
     PlanetOut,
     VaultOut,
 )
-from app.modules.planets._internal.service import InsufficientResourcesError, PlanetService
+from app.modules.planets._internal.service import (
+    InsufficientResourcesError,
+    PlanetService,
+    UpgradeRunningError,
+)
 
 router = APIRouter(prefix="/planets", tags=["planets"])
 
@@ -56,6 +60,7 @@ def read_vault(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> Vaul
     "/{planet_id}/buildings",
     operation_id="list_buildings",
     response_model=list[BuildingOut],
+    response_model_exclude_none=True,
     responses={401: {"model": ErrorOut}, 404: {"model": ErrorOut}, 422: {}},
 )
 def list_buildings(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> list[Building]:
@@ -69,6 +74,7 @@ def list_buildings(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> 
     "/{planet_id}/buildings/{kind}/upgrade",
     operation_id="upgrade_building",
     response_model=BuildingUpgradeOut,
+    response_model_exclude_none=True,
     responses={
         401: {"model": ErrorOut},
         404: {"model": ErrorOut},
@@ -81,9 +87,8 @@ def upgrade_building(
 ) -> BuildingUpgrade:
     try:
         result = service.upgrade_building(planet_id, user_id, kind)
-    except InsufficientResourcesError as error:
+    except (InsufficientResourcesError, UpgradeRunningError) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     if result is None:
         raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
     return result
-
