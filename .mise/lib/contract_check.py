@@ -7,6 +7,9 @@ This file is guarded (CODEOWNERS), so an agent cannot weaken the check.
 
 An operation with "x-planned: true" is not built yet. It can be missing. When
 the backend serves it, the check prints a note to remove the flag.
+
+No served operation can declare null, also a planned one (docs/adr/0110). An
+optional field uses SkipJsonSchema[None].
 """
 
 import json
@@ -86,6 +89,19 @@ def differences(contract: Any, backend: Any, where: str) -> Iterator[str]:
         yield f"{where}: the contract has {json.dumps(contract)}, the backend has {json.dumps(backend)}"
 
 
+def nulls(node: Any, where: str) -> Iterator[str]:
+    """The places where a schema allows null."""
+    if isinstance(node, dict):
+        kind = node.get("type")
+        if kind == "null" or (isinstance(kind, list) and "null" in kind):
+            yield where
+        for key, value in node.items():
+            yield from nulls(value, f"{where}/{key}")
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from nulls(value, f"{where}/{index}")
+
+
 def main(contract_file: str, backend_dir: str) -> int:
     contract = yaml.safe_load(Path(contract_file).read_text())
     sys.path.insert(0, backend_dir)
@@ -113,6 +129,11 @@ def main(contract_file: str, backend_dir: str) -> int:
             shape(backend, path, method.lower()),
             f"{method} {path}",
         )
+    ]
+    mismatches += [
+        f"{where}: the backend allows null. Use SkipJsonSchema[None] (docs/adr/0110)."
+        for method, path in sorted(served)
+        for where in nulls(shape(backend, path, method.lower()), f"{method} {path}")
     ]
     for line in mismatches:
         print(f"check:contracts: {line}", file=sys.stderr)
