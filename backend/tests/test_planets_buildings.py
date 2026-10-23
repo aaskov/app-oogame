@@ -339,33 +339,3 @@ def test_upgrade_building_stores_the_production_with_the_old_factor(session: Ses
 
     assert vault["metal"] == 1000 + 2 * 63 - 90 + 1 * 96
     assert vault["crystal"] == 1000 + 2 * 15 - 22 + 1 * 15
-
-
-# --- the mines operations stay, with the factor and the energy ---------------------------
-
-
-def test_list_mines_includes_the_energy_factor(client: TestClient, session: Session) -> None:
-    planet_id = home_planet(client)
-    set_building_level(session, planet_id, "solar_plant", 1)
-    set_building_level(session, planet_id, "metal_mine", 2)
-
-    [metal_mine, *_] = client.get(f"/planets/{planet_id}/mines").json()
-
-    assert metal_mine["production_per_hour"] == 66
-
-
-def test_upgrade_mine_includes_the_factor_and_the_energy_in_the_vault(
-    client: TestClient, session: Session
-) -> None:
-    planet_id = home_planet(client)
-    set_building_level(session, planet_id, "solar_plant", 1)
-    set_building_level(session, planet_id, "metal_mine", 1)
-
-    response = client.post(f"/planets/{planet_id}/mines/metal_mine/upgrade")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["mine"]["level"] == 2
-    assert body["mine"]["production_per_hour"] == 66
-    assert body["vault"]["energy"] == {"produced": 22, "used": 24}
-    assert body["vault"]["production_per_hour"]["metal"] == 30 + 66

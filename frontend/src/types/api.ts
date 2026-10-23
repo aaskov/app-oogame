@@ -136,58 +136,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/planets/{planet_id}/mines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                planet_id: components["parameters"]["PlanetId"];
-            };
-            cookie?: never;
-        };
-        /**
-         * List the three mines of one planet of the logged-in user.
-         * @description Always three mines, in the order metal_mine, crystal_mine,
-         *     deuterium_synthesizer. A mine that was never upgraded has level 0.
-         *     Replaced by list_buildings. The architect removes it after the
-         *     frontend uses list_buildings (docs/adr/0112).
-         */
-        get: operations["list_mines"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/planets/{planet_id}/mines/{mine}/upgrade": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                planet_id: components["parameters"]["PlanetId"];
-                mine: components["parameters"]["MineKind"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upgrade one mine by one level. It costs resources from the vault.
-         * @description The upgrade is instant. The server first adds the production up to now,
-         *     then subtracts the cost and raises the level, in one transaction. Two
-         *     upgrades at the same time cannot spend the same resources (docs/adr/0111).
-         *     Replaced by upgrade_building. The architect removes it after the
-         *     frontend uses upgrade_building (docs/adr/0112).
-         */
-        post: operations["upgrade_mine"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/planets/{planet_id}/buildings": {
         parameters: {
             query?: never;
@@ -280,20 +228,6 @@ export interface components {
             deuterium: components["schemas"]["Amount"];
         };
         /** @enum {string} */
-        MineKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer";
-        Mine: {
-            kind: components["schemas"]["MineKind"];
-            level: number;
-            /** @description What this mine adds per hour, at its level, without the base income. */
-            production_per_hour: components["schemas"]["Amount"];
-            /** @description The cost of the next level. */
-            upgrade_cost: components["schemas"]["Resources"];
-        };
-        MineUpgrade: {
-            mine: components["schemas"]["Mine"];
-            vault: components["schemas"]["Vault"];
-        };
-        /** @enum {string} */
         BuildingKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer" | "solar_plant";
         /**
          * @description Energy is not stored and does not count up. If used is more than
@@ -350,7 +284,6 @@ export interface components {
     };
     parameters: {
         PlanetId: string;
-        MineKind: components["schemas"]["MineKind"];
         BuildingKind: components["schemas"]["BuildingKind"];
     };
     requestBodies: never;
@@ -568,94 +501,6 @@ export interface operations {
             };
             404: components["responses"]["PlanetNotFound"];
             /** @description The planet ID is not a UUID. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    list_mines: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                planet_id: components["parameters"]["PlanetId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The mines of the planet. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Mine"][];
-                };
-            };
-            /** @description No valid session. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            404: components["responses"]["PlanetNotFound"];
-            /** @description The planet ID is not a UUID. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    upgrade_mine: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                planet_id: components["parameters"]["PlanetId"];
-                mine: components["parameters"]["MineKind"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The mine after the upgrade, and the vault after the cost. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MineUpgrade"];
-                };
-            };
-            /** @description No valid session. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            404: components["responses"]["PlanetNotFound"];
-            /** @description The vault has too little for the upgrade cost. Nothing changes. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description The planet ID is not a UUID, or the mine is not one of the three kinds. */
             422: {
                 headers: {
                     [name: string]: unknown;

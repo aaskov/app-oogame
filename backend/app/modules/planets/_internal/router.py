@@ -9,9 +9,6 @@ from app.modules.planets._internal.models import (
     Building,
     BuildingKind,
     BuildingUpgrade,
-    Mine,
-    MineKind,
-    MineUpgrade,
     Planet,
     Vault,
 )
@@ -19,8 +16,6 @@ from app.modules.planets._internal.schemas import (
     BuildingOut,
     BuildingUpgradeOut,
     ErrorOut,
-    MineOut,
-    MineUpgradeOut,
     PlanetOut,
     VaultOut,
 )
@@ -92,38 +87,3 @@ def upgrade_building(
         raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
     return result
 
-
-@router.get(
-    "/{planet_id}/mines",
-    operation_id="list_mines",
-    response_model=list[MineOut],
-    responses={401: {"model": ErrorOut}, 404: {"model": ErrorOut}, 422: {}},
-)
-def list_mines(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> list[Mine]:
-    mines = service.list_mines(planet_id, user_id)
-    if mines is None:
-        raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
-    return mines
-
-
-@router.post(
-    "/{planet_id}/mines/{mine}/upgrade",
-    operation_id="upgrade_mine",
-    response_model=MineUpgradeOut,
-    responses={
-        401: {"model": ErrorOut},
-        404: {"model": ErrorOut},
-        409: {"model": ErrorOut},
-        422: {},
-    },
-)
-def upgrade_mine(
-    planet_id: UUID, mine: MineKind, user_id: UserIdDep, service: ServiceDep
-) -> MineUpgrade:
-    try:
-        result = service.upgrade_mine(planet_id, user_id, mine)
-    except InsufficientResourcesError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
-    if result is None:
-        raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
-    return result
