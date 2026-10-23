@@ -146,10 +146,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the four buildings of one planet of the logged-in user.
-         * @description Always four buildings, in the order metal_mine, crystal_mine,
-         *     deuterium_synthesizer, solar_plant. A building that was never upgraded
-         *     has level 0 (docs/adr/0112).
+         * List the seven buildings of one planet of the logged-in user.
+         * @description Always seven buildings, in the order metal_mine, crystal_mine,
+         *     deuterium_synthesizer, solar_plant, metal_storage, crystal_storage,
+         *     deuterium_tank. A building that was never upgraded has level 0
+         *     (docs/adr/0112, docs/adr/0113).
          */
         get: operations["list_buildings"];
         put?: never;
@@ -219,6 +220,11 @@ export interface components {
             production_per_hour: components["schemas"]["Resources"];
             /** @description The energy of the whole planet. */
             energy: components["schemas"]["Energy"];
+            /**
+             * @description The maximum of each resource. Production stops at the maximum. An
+             *     amount above it stays, but does not grow (docs/adr/0113).
+             */
+            capacity: components["schemas"]["Resources"];
             /** Format: date-time */
             calculated_at: string;
         };
@@ -228,7 +234,7 @@ export interface components {
             deuterium: components["schemas"]["Amount"];
         };
         /** @enum {string} */
-        BuildingKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer" | "solar_plant";
+        BuildingKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer" | "solar_plant" | "metal_storage" | "crystal_storage" | "deuterium_tank";
         /**
          * @description Energy is not stored and does not count up. If used is more than
          *     produced, each mine produces only produced / used of its production
@@ -243,12 +249,12 @@ export interface components {
             level: number;
             /**
              * @description What this building adds per hour, at its level, after the energy
-             *     factor and without the base income. 0 for the solar plant.
+             *     factor and without the base income. 0 for the solar plant and the storage.
              */
             production_per_hour: components["schemas"]["Amount"];
             /**
              * @description What this building produces and uses, at its level. A mine has
-             *     produced 0. The solar plant has used 0.
+             *     produced 0. The solar plant has used 0. The storage has 0 and 0.
              */
             energy: components["schemas"]["Energy"];
             /** @description The cost of the next level. */
@@ -588,7 +594,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The planet ID is not a UUID, or the kind is not one of the four building kinds. */
+            /** @description The planet ID is not a UUID, or the kind is not one of the seven building kinds. */
             422: {
                 headers: {
                     [name: string]: unknown;

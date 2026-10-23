@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.6.0
+  version: 0.7.0
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -132,6 +132,7 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: read_vault
+      x-planned: true
       summary: Return the vault of one planet of the logged-in user, with its production.
       description: |
         The amounts are calculated at calculated_at: the stored amounts plus the
@@ -161,11 +162,13 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: list_buildings
-      summary: List the four buildings of one planet of the logged-in user.
+      x-planned: true
+      summary: List the seven buildings of one planet of the logged-in user.
       description: |
-        Always four buildings, in the order metal_mine, crystal_mine,
-        deuterium_synthesizer, solar_plant. A building that was never upgraded
-        has level 0 (docs/adr/0112).
+        Always seven buildings, in the order metal_mine, crystal_mine,
+        deuterium_synthesizer, solar_plant, metal_storage, crystal_storage,
+        deuterium_tank. A building that was never upgraded has level 0
+        (docs/adr/0112, docs/adr/0113).
       responses:
         "200":
           description: The buildings of the planet.
@@ -192,6 +195,7 @@ paths:
       - $ref: "#/components/parameters/BuildingKind"
     post:
       operationId: upgrade_building
+      x-planned: true
       summary: Upgrade one building by one level. It costs resources from the vault.
       description: |
         The upgrade is instant. The server first adds the production up to now,
@@ -220,7 +224,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "422":
-          description: The planet ID is not a UUID, or the kind is not one of the four building kinds.
+          description: The planet ID is not a UUID, or the kind is not one of the seven building kinds.
 
 components:
   parameters:
@@ -296,7 +300,7 @@ components:
 
     Vault:
       type: object
-      required: [planet_id, metal, crystal, deuterium, production_per_hour, energy, calculated_at]
+      required: [planet_id, metal, crystal, deuterium, production_per_hour, energy, capacity, calculated_at]
       properties:
         planet_id:
           type: string
@@ -312,6 +316,11 @@ components:
         energy:
           description: The energy of the whole planet.
           $ref: "#/components/schemas/Energy"
+        capacity:
+          description: |
+            The maximum of each resource. Production stops at the maximum. An
+            amount above it stays, but does not grow (docs/adr/0113).
+          $ref: "#/components/schemas/Resources"
         calculated_at:
           type: string
           format: date-time
@@ -329,7 +338,7 @@ components:
 
     BuildingKind:
       type: string
-      enum: [metal_mine, crystal_mine, deuterium_synthesizer, solar_plant]
+      enum: [metal_mine, crystal_mine, deuterium_synthesizer, solar_plant, metal_storage, crystal_storage, deuterium_tank]
 
     Energy:
       description: |
@@ -358,12 +367,12 @@ components:
         production_per_hour:
           description: |
             What this building adds per hour, at its level, after the energy
-            factor and without the base income. 0 for the solar plant.
+            factor and without the base income. 0 for the solar plant and the storage.
           $ref: "#/components/schemas/Amount"
         energy:
           description: |
             What this building produces and uses, at its level. A mine has
-            produced 0. The solar plant has used 0.
+            produced 0. The solar plant has used 0. The storage has 0 and 0.
           $ref: "#/components/schemas/Energy"
         upgrade_cost:
           description: The cost of the next level.

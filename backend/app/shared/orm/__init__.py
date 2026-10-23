@@ -5,7 +5,7 @@ migration in backend/migrations/.
 """
 
 from app.shared.orm.base import Base
-from app.shared.orm.buildings import BUILDING_KINDS, MINE_KINDS, BuildingRow
+from app.shared.orm.buildings import BUILDING_KINDS, MINE_KINDS, STORAGE_KINDS, BuildingRow
 from app.shared.orm.planets import HOME_PLANET_NAME, PlanetRow
 from app.shared.orm.users import UserRow
 from app.shared.orm.vaults import START_CRYSTAL, START_DEUTERIUM, START_METAL, VaultRow
@@ -17,6 +17,7 @@ __all__ = [
     "START_CRYSTAL",
     "START_DEUTERIUM",
     "START_METAL",
+    "STORAGE_KINDS",
     "Base",
     "BuildingRow",
     "PlanetRow",
