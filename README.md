@@ -41,6 +41,7 @@ Start and finish an agent from the host, in the main checkout (docs/adr/0006):
 ```bash
 mise run agent:start <issue>    # clone, branch, container, Claude with the issue prompt
 AGENT_MODEL=<model> mise run agent:start <issue>   # another model than claude-sonnet-5-5
+AGENT_PERMISSION_MODE=default mise run agent:start <issue>   # ask before each command
 mise run agent:finish <issue>   # it refuses if work is not pushed
 ```
 
