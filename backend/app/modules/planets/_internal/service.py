@@ -35,12 +35,15 @@ _ENERGY_USED_COEFFICIENT: dict[str, int] = {
 # The base income of each planet per hour, before GAME_SPEED (docs/adr/0111).
 _BASE_INCOME = Resources(metal=30, crystal=15, deuterium=0)
 
-# (metal base, crystal base, ratio) for the cost of the next level (docs/adr/0111, 0112).
+# (metal base, crystal base, ratio) for the cost of the next level (docs/adr/0111, 0112, 0113).
 _UPGRADE_COST: dict[BuildingKind, tuple[float, float, float]] = {
     "metal_mine": (60, 15, 1.5),
     "crystal_mine": (48, 24, 1.6),
     "deuterium_synthesizer": (225, 75, 1.5),
     "solar_plant": (75, 30, 1.5),
+    "metal_storage": (1000, 0, 2.0),
+    "crystal_storage": (1000, 500, 2.0),
+    "deuterium_tank": (1000, 1000, 2.0),
 }
 
 
@@ -103,8 +106,26 @@ def _vault_production_per_hour(
     )
 
 
-def _calculate_amount(stored: int, production_per_hour: int, hours: float) -> int:
-    return _clamp(math.floor(stored + production_per_hour * hours))
+def _storage_capacity(level: int) -> int:
+    """The capacity at the given storage building level (docs/adr/0113)."""
+    exponent = 20 * level / 33
+    return _clamp(5000 * math.floor(2.5 * math.exp(exponent)))
+
+
+def _vault_capacity(levels: dict[str, int]) -> Resources:
+    """The capacity of each resource, determined by storage building levels."""
+    return Resources(
+        metal=_storage_capacity(levels.get("metal_storage", 0)),
+        crystal=_storage_capacity(levels.get("crystal_storage", 0)),
+        deuterium=_storage_capacity(levels.get("deuterium_tank", 0)),
+    )
+
+
+def _calculate_amount(stored: int, production_per_hour: int, hours: float, capacity: int) -> int:
+    """Calculate the amount of a resource, capped at capacity (docs/adr/0113)."""
+    if stored >= capacity:
+        return _clamp(stored)
+    return _clamp(min(capacity, math.floor(stored + production_per_hour * hours)))
 
 
 class PlanetService:
@@ -147,11 +168,11 @@ class PlanetService:
     ) -> tuple[dict[str, int], Vault] | None:
         """Lock the vault, store the production up to now, and pay for the upgrade.
 
-        The production is stored with the old energy factor. Raises
-        InsufficientResourcesError, and rolls back, if the vault has too
+        The production is stored with the old energy factor and old capacity.
+        Raises InsufficientResourcesError, and rolls back, if the vault has too
         little. One transaction, so two upgrades at the same time cannot spend
-        the same resources (docs/adr/0111, docs/adr/0112). Returns the levels
-        after the upgrade and the vault after the cost.
+        the same resources (docs/adr/0111, docs/adr/0112, docs/adr/0113).
+        Returns the levels after the upgrade and the vault after the cost.
         """
         vault_row = self._repository.lock_vault(planet_id, user_id)
         if vault_row is None:
@@ -180,6 +201,7 @@ class PlanetService:
 
         new_levels = {**levels, kind: level + 1}
         energy = _planet_energy(new_levels)
+        new_capacity = _vault_capacity(new_levels)
         new_vault = Vault(
             planet_id=planet_id,
             metal=metal,
@@ -189,6 +211,7 @@ class PlanetService:
                 new_levels, _energy_factor(energy), self._settings.game_speed
             ),
             energy=energy,
+            capacity=new_capacity,
             calculated_at=self._now,
         )
         return new_levels, new_vault
@@ -211,15 +234,23 @@ class PlanetService:
         production = _vault_production_per_hour(
             levels, _energy_factor(energy), self._settings.game_speed
         )
+        capacity = _vault_capacity(levels)
         # A request can read its time, then wait for an upgrade that stores a
         # later time. Negative hours count as 0 (docs/adr/0111).
         hours = max(0.0, (self._now - row.updated_at).total_seconds() / 3600)
         return Vault(
             planet_id=row.planet_id,
-            metal=_calculate_amount(row.metal, production.metal, hours),
-            crystal=_calculate_amount(row.crystal, production.crystal, hours),
-            deuterium=_calculate_amount(row.deuterium, production.deuterium, hours),
+            metal=_calculate_amount(
+                row.metal, production.metal, hours, capacity.metal
+            ),
+            crystal=_calculate_amount(
+                row.crystal, production.crystal, hours, capacity.crystal
+            ),
+            deuterium=_calculate_amount(
+                row.deuterium, production.deuterium, hours, capacity.deuterium
+            ),
             production_per_hour=production,
             energy=energy,
+            capacity=capacity,
             calculated_at=self._now,
         )
