@@ -18,16 +18,18 @@ const vault = {
   calculated_at: "2026-10-19T00:00:00.000Z",
 };
 
-type Route = { status: number; body?: unknown };
+type Reply = { status: number; body?: unknown };
+type Route = Reply | Reply[];
 
 function fakeFetch(routes: Record<string, Route>, seen: Request[] = []) {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     seen.push(request);
-    const route = routes[`${request.method} ${new URL(request.url).pathname}`];
-    if (!route) {
+    const entry = routes[`${request.method} ${new URL(request.url).pathname}`];
+    if (!entry) {
       return new Response(null, { status: 404 });
     }
+    const route = Array.isArray(entry) ? (entry.length > 1 ? entry.shift()! : entry[0]) : entry;
     return new Response(route.body === undefined ? null : JSON.stringify(route.body), {
       status: route.status,
       headers: { "Content-Type": "application/json" },
@@ -168,5 +170,40 @@ describe("useVault", () => {
     });
 
     expect(result.current.amounts?.metal).toEqual(15000);
+  });
+
+  it("reloads the vault on demand, for example when a building's countdown reaches 0", async () => {
+    const seen: Request[] = [];
+    const client = createApi(
+      fakeFetch(
+        {
+          [`GET /planets/${planetId}/vault`]: [
+            { status: 200, body: vault },
+            { status: 200, body: { ...vault, metal: 999 } },
+          ],
+        },
+        seen,
+      ),
+    );
+    const { result } = renderHook(() => useVault(planetId, client));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.reload();
+    });
+
+    expect(result.current.vault?.metal).toBe(999);
+    expect(seen.filter((r) => r.method === "GET")).toHaveLength(2);
+  });
+
+  it("does nothing when reload is called without a planet", async () => {
+    const client = createApi(fakeFetch({}));
+    const { result } = renderHook(() => useVault(null, client));
+
+    await act(async () => {
+      await result.current.reload();
+    });
+
+    expect(result.current.vault).toBeNull();
   });
 });

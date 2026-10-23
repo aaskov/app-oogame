@@ -101,6 +101,19 @@ export const buildingsAfterUpgrade: Building[] = [
   buildings[6],
 ];
 
+// The metal mine's upgrade to level 2 is running, due 108 seconds after the
+// system time the tests set ("2026-10-19T00:00:00Z"), matching the example
+// build time of docs/adr/0114.
+export const buildingsUpgrading: Building[] = [
+  { ...buildings[0], upgrade_finishes_at: "2026-10-19T00:01:48Z" },
+  buildings[1],
+  buildings[2],
+  buildings[3],
+  buildings[4],
+  buildings[5],
+  buildings[6],
+];
+
 export function fakeFetch(routes: Record<string, Route>, seen: Request[] = []) {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);

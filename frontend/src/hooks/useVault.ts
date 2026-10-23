@@ -76,8 +76,30 @@ export function useVault(planetId: string | null, client: Api = defaultApi) {
     return () => clearInterval(id);
   }, [vault]);
 
+  // For a caller that needs the vault read again, for example when a
+  // building's upgrade finishes (docs/adr/0114).
+  const reload = useCallback(async () => {
+    if (!planetId) {
+      return;
+    }
+    try {
+      const { data, response } = await client.GET("/planets/{planet_id}/vault", {
+        params: { path: { planet_id: planetId } },
+      });
+      if (data) {
+        setVault(data);
+      } else {
+        setVaultState(null);
+        setError(response.status);
+      }
+    } catch {
+      setVaultState(null);
+      setError(0);
+    }
+  }, [planetId, client, setVault]);
+
   const loading = planetId !== null && planetId !== loadedPlanetId;
   const amounts = vault ? amountsAt(vault, now) : null;
 
-  return { vault, amounts, loading, error, setVault };
+  return { vault, amounts, loading, error, setVault, reload };
 }
