@@ -13,6 +13,7 @@ export const vault: Vault = {
   deuterium: 0,
   production_per_hour: { metal: 30, crystal: 15, deuterium: 0 },
   energy: { produced: 22, used: 22 },
+  capacity: { metal: 10000, crystal: 10000, deuterium: 10000 },
   calculated_at: "2026-10-19T00:00:00Z",
 };
 
@@ -64,6 +65,7 @@ export const buildingUpgrade: BuildingUpgrade = {
     deuterium: 0,
     production_per_hour: { metal: 75, crystal: 28, deuterium: 0 },
     energy: { produced: 22, used: 35 },
+    capacity: { metal: 10000, crystal: 10000, deuterium: 10000 },
     calculated_at: "2026-10-19T00:00:00Z",
   },
 };

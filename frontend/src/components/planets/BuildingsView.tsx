@@ -11,6 +11,9 @@ const BUILDING_NAMES: Record<BuildingKind, string> = {
   crystal_mine: "Crystal mine",
   deuterium_synthesizer: "Deuterium synthesizer",
   solar_plant: "Solar plant",
+  metal_storage: "Metal storage",
+  crystal_storage: "Crystal storage",
+  deuterium_tank: "Deuterium tank",
 };
 
 function format(value: number) {
