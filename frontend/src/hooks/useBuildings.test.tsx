@@ -243,7 +243,7 @@ describe("useBuildings", () => {
       outcome = await result.current.upgrade("metal_mine");
     });
 
-    expect(outcome).toEqual({ status: 409 });
+    expect(outcome).toEqual({ status: 409, detail: "Not enough resources" });
     expect(result.current.buildings).toEqual(buildings);
     expect(seen.filter((r) => r.method === "GET")).toHaveLength(1);
   });
@@ -266,6 +266,41 @@ describe("useBuildings", () => {
       outcome = await result.current.upgrade("solar_plant");
     });
 
-    expect(outcome).toEqual({ status: 404 });
+    expect(outcome).toEqual({ status: 404, detail: "Not found" });
+  });
+
+  it("reloads the list on demand, for example when a countdown reaches 0", async () => {
+    const seen: Request[] = [];
+    const client = createApi(
+      fakeFetch(
+        {
+          [`GET /planets/${planetId}/buildings`]: [
+            { status: 200, body: buildings },
+            { status: 200, body: reloaded },
+          ],
+        },
+        seen,
+      ),
+    );
+    const { result } = renderHook(() => useBuildings(planetId, client));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.reload();
+    });
+
+    expect(result.current.buildings).toEqual(reloaded);
+    expect(seen.filter((r) => r.method === "GET")).toHaveLength(2);
+  });
+
+  it("does nothing when reload is called without a planet", async () => {
+    const client = createApi(fakeFetch({}));
+    const { result } = renderHook(() => useBuildings(null, client));
+
+    await act(async () => {
+      await result.current.reload();
+    });
+
+    expect(result.current.buildings).toEqual([]);
   });
 });

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { useBuildings } from "@/hooks/useBuildings";
+import { useCountdown } from "@/hooks/useCountdown";
 import type { Amounts } from "@/hooks/useVault";
 import type { api, Building, BuildingKind, Resources, Vault } from "@/lib/api";
 
@@ -52,14 +53,16 @@ export function BuildingsView({
   client,
   amounts,
   onUpgraded,
+  onCountdownComplete,
 }: {
   planetId: string | null;
   client?: typeof api;
   amounts: Amounts | null;
   onUpgraded: (vault: Vault) => void;
+  onCountdownComplete: () => void;
 }) {
-  const { buildings, loading, error, upgrade } = useBuildings(planetId, client);
-  const [actionError, setActionError] = useState<number | null>(null);
+  const { buildings, loading, error, upgrade, reload } = useBuildings(planetId, client);
+  const [actionError, setActionError] = useState<{ status: number; detail?: string } | null>(null);
   const [pending, setPending] = useState<BuildingKind | null>(null);
   const [actionPlanetId, setActionPlanetId] = useState(planetId);
 
@@ -68,6 +71,17 @@ export function BuildingsView({
     setActionError(null);
     setPending(null);
   }
+
+  const upgrading = buildings.find((building) => building.upgrade_finishes_at);
+
+  // The server completes a due upgrade on the next read (docs/adr/0114), so
+  // reading the list and the vault again is enough to show the result.
+  const handleCountdownComplete = useCallback(() => {
+    reload();
+    onCountdownComplete();
+  }, [reload, onCountdownComplete]);
+
+  const countdownText = useCountdown(upgrading?.upgrade_finishes_at, handleCountdownComplete);
 
   if (!planetId || loading) {
     return null;
@@ -89,18 +103,18 @@ export function BuildingsView({
     if (result.vault) {
       onUpgraded(result.vault);
     } else {
-      setActionError(result.status);
+      setActionError({ status: result.status, detail: result.detail });
     }
   }
 
   return (
     <section aria-label="Buildings" className="flex flex-col gap-4">
-      {actionError === 409 && (
+      {actionError?.status === 409 && (
         <p role="alert" className="text-sm text-red-600">
-          Not enough resources.
+          {actionError.detail}
         </p>
       )}
-      {actionError === 404 && (
+      {actionError?.status === 404 && (
         <p role="alert" className="text-sm text-red-600">
           This planet was not found.
         </p>
@@ -114,6 +128,8 @@ export function BuildingsView({
             building.kind === "deuterium_tank";
           const isMine = !isStorage && building.kind !== "solar_plant";
           const affordable = canAfford(amounts, building.upgrade_cost);
+          const isUpgradingThis = building.kind === upgrading?.kind;
+          const anotherUpgradeRuns = upgrading !== undefined && !isUpgradingThis;
           return (
             <li
               key={building.kind}
@@ -126,17 +142,22 @@ export function BuildingsView({
                     ? `Level ${building.level} · +${format(building.production_per_hour)}/h`
                     : `Level ${building.level}`}
                 </p>
+                {isUpgradingThis && countdownText && (
+                  <p className="text-sm text-zinc-500">
+                    Upgrading to level {building.level + 1} · {countdownText}
+                  </p>
+                )}
                 {!isStorage && <p className="text-sm text-zinc-500">{energyText(building.energy)}</p>}
                 <p className="text-sm text-zinc-500">{costText(building.upgrade_cost)}</p>
               </div>
               <button
                 type="button"
                 aria-label={`Upgrade ${name}`}
-                disabled={!affordable || pending === building.kind}
+                disabled={upgrading !== undefined || !affordable || pending === building.kind}
                 onClick={() => handleUpgrade(building.kind)}
                 className="rounded border border-zinc-900 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-300"
               >
-                Upgrade
+                {anotherUpgradeRuns ? "Another upgrade runs" : "Upgrade"}
               </button>
             </li>
           );

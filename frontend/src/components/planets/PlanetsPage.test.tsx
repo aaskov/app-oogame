@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ import {
   buildingUpgrade,
   buildings,
   buildingsAfterUpgrade,
+  buildingsUpgrading,
   colony,
   fakeFetch,
   homeworld,
@@ -133,5 +134,35 @@ describe("PlanetsPage", () => {
     await waitFor(() => expect(screen.getByText("Level 1 · +13/h")).toBeTruthy());
     expect(screen.getByText("Level 2 · +45/h")).toBeTruthy();
     expect(seen.some((r) => new URL(r.url).pathname.endsWith("/mines"))).toBe(false);
+  });
+
+  it("reads the buildings and the vault again when a running upgrade finishes", async () => {
+    const seen: Request[] = [];
+    renderPage(
+      {
+        "GET /auth/me": { status: 200, body: ada },
+        "GET /planets": { status: 200, body: [homeworld] },
+        [`GET /planets/${homeworld.id}/vault`]: [
+          { status: 200, body: vault },
+          { status: 200, body: { ...vault, metal: 999 } },
+        ],
+        [`GET /planets/${homeworld.id}/buildings`]: [
+          { status: 200, body: buildingsUpgrading },
+          { status: 200, body: buildingsAfterUpgrade },
+        ],
+      },
+      seen,
+    );
+
+    expect(await screen.findByText("Upgrading to level 2 · 1:48")).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(108_000);
+    });
+
+    await waitFor(() => expect(screen.getByText("Level 2 · +45/h")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Metal").nextElementSibling?.textContent).toBe("999 / 10,000"));
+    expect(seen.filter((r) => r.method === "GET" && new URL(r.url).pathname.endsWith("/buildings"))).toHaveLength(2);
+    expect(seen.filter((r) => r.method === "GET" && new URL(r.url).pathname.endsWith("/vault"))).toHaveLength(2);
   });
 });

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BuildingsView } from "@/components/planets/BuildingsView";
@@ -6,6 +6,7 @@ import {
   buildingUpgrade,
   buildings,
   buildingsAfterUpgrade,
+  buildingsUpgrading,
   fakeFetch,
   homeworld,
 } from "@/components/planets/fakeFetch";
@@ -30,9 +31,18 @@ function renderView(
   amounts: { metal: number; crystal: number; deuterium: number } | null = rich,
   onUpgraded = vi.fn(),
   seen: Request[] = [],
+  onCountdownComplete = vi.fn(),
 ) {
   const client = createApi(fakeFetch(routes, seen));
-  render(<BuildingsView planetId={homeworld.id} client={client} amounts={amounts} onUpgraded={onUpgraded} />);
+  render(
+    <BuildingsView
+      planetId={homeworld.id}
+      client={client}
+      amounts={amounts}
+      onUpgraded={onUpgraded}
+      onCountdownComplete={onCountdownComplete}
+    />,
+  );
   return onUpgraded;
 }
 
@@ -47,7 +57,13 @@ function row(name: string) {
 describe("BuildingsView", () => {
   it("renders nothing without a selected planet", () => {
     render(
-      <BuildingsView planetId={null} client={createApi(fakeFetch({}))} amounts={null} onUpgraded={vi.fn()} />,
+      <BuildingsView
+        planetId={null}
+        client={createApi(fakeFetch({}))}
+        amounts={null}
+        onUpgraded={vi.fn()}
+        onCountdownComplete={vi.fn()}
+      />,
     );
 
     expect(screen.queryByRole("region", { name: "Buildings" })).toBeNull();
@@ -160,7 +176,7 @@ describe("BuildingsView", () => {
     expect(seen.filter((r) => r.method === "GET")).toHaveLength(2);
   });
 
-  it("shows 'Not enough resources.' on a 409", async () => {
+  it("shows the detail from a 409 response", async () => {
     renderView({
       [listRoute]: { status: 200, body: buildings },
       [upgradeRoute("metal_mine")]: { status: 409, body: { detail: "Not enough resources" } },
@@ -168,7 +184,21 @@ describe("BuildingsView", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Upgrade Metal mine" }));
 
-    expect((await screen.findByRole("alert")).textContent).toBe("Not enough resources.");
+    expect((await screen.findByRole("alert")).textContent).toBe("Not enough resources");
+  });
+
+  it("shows a different 409 detail when another upgrade runs on the planet", async () => {
+    renderView({
+      [listRoute]: { status: 200, body: buildings },
+      [upgradeRoute("metal_mine")]: {
+        status: 409,
+        body: { detail: "An upgrade already runs on this planet" },
+      },
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Upgrade Metal mine" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("An upgrade already runs on this planet");
   });
 
   it("shows 'This planet was not found.' when the list 404s", async () => {
@@ -232,5 +262,57 @@ describe("BuildingsView", () => {
     expect(row("Metal storage").getByText("Cost: 1,000 metal, 0 crystal")).toBeTruthy();
     expect(row("Crystal storage").getByText("Cost: 1,000 metal, 500 crystal")).toBeTruthy();
     expect(row("Deuterium tank").getByText("Cost: 1,000 metal, 1,000 crystal")).toBeTruthy();
+  });
+
+  it("shows the countdown for the upgrading building, counting down each second", async () => {
+    renderView({ [listRoute]: { status: 200, body: buildingsUpgrading } });
+    await screen.findByText("Metal mine");
+
+    await waitFor(() => expect(row("Metal mine").getByText("Upgrading to level 2 · 1:48")).toBeTruthy());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(row("Metal mine").getByText("Upgrading to level 2 · 1:47")).toBeTruthy();
+  });
+
+  it("turns off every Upgrade button while an upgrade runs, and labels the other buttons", async () => {
+    renderView({ [listRoute]: { status: 200, body: buildingsUpgrading } });
+    await screen.findByText("Metal mine");
+
+    const upgrading = screen.getByRole("button", { name: "Upgrade Metal mine" }) as HTMLButtonElement;
+    expect(upgrading.disabled).toBe(true);
+    expect(upgrading.textContent).toBe("Upgrade");
+
+    const other = screen.getByRole("button", { name: "Upgrade Crystal mine" }) as HTMLButtonElement;
+    expect(other.disabled).toBe(true);
+    expect(other.textContent).toBe("Another upgrade runs");
+  });
+
+  it("reads the buildings again, and tells the caller to reload the vault, when the countdown reaches 0", async () => {
+    const seen: Request[] = [];
+    const onCountdownComplete = vi.fn();
+    renderView(
+      {
+        [listRoute]: [
+          { status: 200, body: buildingsUpgrading },
+          { status: 200, body: buildingsAfterUpgrade },
+        ],
+      },
+      rich,
+      vi.fn(),
+      seen,
+      onCountdownComplete,
+    );
+    await screen.findByText("Metal mine");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(108_000);
+    });
+
+    await waitFor(() => expect(row("Metal mine").getByText("Level 2 · +45/h")).toBeTruthy());
+    expect(onCountdownComplete).toHaveBeenCalledTimes(1);
+    expect(seen.filter((r) => r.method === "GET")).toHaveLength(2);
   });
 });
