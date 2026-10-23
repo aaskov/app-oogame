@@ -41,5 +41,6 @@ a maximum, and a storage building raises it.
 ## Consequences
 
 - `read_vault`, `list_buildings`, and `upgrade_building` are `x-planned` in the
-  prep, because their responses changed. The cleanup removes the flags.
+  prep, because their responses changed. The cleanup removes the flags
+  (done after #50 and #51).
 - No new schema, so `frontend/src/lib/api.ts` needs no new export (lesson 17).

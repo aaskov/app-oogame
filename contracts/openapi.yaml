@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.7.0
+  version: 0.7.1
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -132,7 +132,6 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: read_vault
-      x-planned: true
       summary: Return the vault of one planet of the logged-in user, with its production.
       description: |
         The amounts are calculated at calculated_at: the stored amounts plus the
@@ -162,7 +161,6 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: list_buildings
-      x-planned: true
       summary: List the seven buildings of one planet of the logged-in user.
       description: |
         Always seven buildings, in the order metal_mine, crystal_mine,
@@ -195,7 +193,6 @@ paths:
       - $ref: "#/components/parameters/BuildingKind"
     post:
       operationId: upgrade_building
-      x-planned: true
       summary: Upgrade one building by one level. It costs resources from the vault.
       description: |
         The upgrade is instant. The server first adds the production up to now,
