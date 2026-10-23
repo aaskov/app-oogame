@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.7.1
+  version: 0.8.0
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -161,6 +161,7 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: list_buildings
+      x-planned: true
       summary: List the seven buildings of one planet of the logged-in user.
       description: |
         Always seven buildings, in the order metal_mine, crystal_mine,
@@ -193,15 +194,18 @@ paths:
       - $ref: "#/components/parameters/BuildingKind"
     post:
       operationId: upgrade_building
-      summary: Upgrade one building by one level. It costs resources from the vault.
+      x-planned: true
+      summary: Start the upgrade of one building by one level. It costs resources from the vault.
       description: |
-        The upgrade is instant. The server first adds the production up to now,
-        then subtracts the cost and raises the level, in one transaction. Two
-        upgrades at the same time cannot spend the same resources. An upgrade
-        that makes the energy too low is allowed (docs/adr/0112).
+        The server first completes an upgrade that is due and adds the
+        production up to now. Then it subtracts the cost and starts the
+        upgrade, in one transaction. The level goes up at upgrade_finishes_at
+        (docs/adr/0114). A planet has at most one running upgrade. Two upgrades
+        at the same time cannot spend the same resources. An upgrade that
+        makes the energy too low is allowed (docs/adr/0112).
       responses:
         "200":
-          description: The building after the upgrade, and the vault after the cost.
+          description: The building with its upgrade_finishes_at, and the vault after the cost.
           content:
             application/json:
               schema:
@@ -215,7 +219,7 @@ paths:
         "404":
           $ref: "#/components/responses/PlanetNotFound"
         "409":
-          description: The vault has too little for the upgrade cost. Nothing changes.
+          description: The vault has too little for the upgrade cost, or an upgrade runs on the planet. Nothing changes.
           content:
             application/json:
               schema:
@@ -374,6 +378,12 @@ components:
         upgrade_cost:
           description: The cost of the next level.
           $ref: "#/components/schemas/Resources"
+        upgrade_finishes_at:
+          description: |
+            Only on the building with the running upgrade. At this time, the
+            level goes up by one (docs/adr/0114).
+          type: string
+          format: date-time
 
     BuildingUpgrade:
       type: object
