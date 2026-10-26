@@ -19,6 +19,12 @@ export type Amount = components["schemas"]["Amount"];
 export type BuildingKind = components["schemas"]["BuildingKind"];
 export type Building = components["schemas"]["Building"];
 export type BuildingUpgrade = components["schemas"]["BuildingUpgrade"];
+export type ShipKind = components["schemas"]["ShipKind"];
+export type Ship = components["schemas"]["Ship"];
+export type ShipOrder = components["schemas"]["ShipOrder"];
+export type Shipyard = components["schemas"]["Shipyard"];
+export type ShipOrderRequest = components["schemas"]["ShipOrderRequest"];
+export type ShipOrderResult = components["schemas"]["ShipOrderResult"];
 export type Energy = components["schemas"]["Energy"];
 export type ApiError = components["schemas"]["Error"];
 

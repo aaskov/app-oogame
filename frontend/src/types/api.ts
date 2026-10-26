@@ -146,11 +146,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the seven buildings of one planet of the logged-in user.
-         * @description Always seven buildings, in the order metal_mine, crystal_mine,
+         * List the eight buildings of one planet of the logged-in user.
+         * @description Always eight buildings, in the order metal_mine, crystal_mine,
          *     deuterium_synthesizer, solar_plant, metal_storage, crystal_storage,
-         *     deuterium_tank. A building that was never upgraded has level 0
-         *     (docs/adr/0112, docs/adr/0113).
+         *     deuterium_tank, shipyard. A building that was never upgraded has
+         *     level 0 (docs/adr/0112, docs/adr/0113, docs/adr/0115).
          */
         get: operations["list_buildings"];
         put?: never;
@@ -183,6 +183,54 @@ export interface paths {
          *     makes the energy too low is allowed (docs/adr/0112).
          */
         post: operations["upgrade_building"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planets/{planet_id}/ships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Show the ships and the running ship order of one planet of the logged-in user.
+         * @description The server first completes the ships that are due (docs/adr/0115).
+         */
+        get: operations["read_shipyard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planets/{planet_id}/ships/{kind}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+                kind: components["parameters"]["ShipKind"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start an order of a number of ships of one kind. It costs resources from the vault.
+         * @description The server first completes the ships that are due and adds the
+         *     production up to now. Then it subtracts the cost of all the ships and
+         *     starts the order, in one transaction. The ships are complete one by
+         *     one (docs/adr/0115). A planet has at most one running ship order.
+         */
+        post: operations["order_ships"];
         delete?: never;
         options?: never;
         head?: never;
@@ -236,7 +284,7 @@ export interface components {
             deuterium: components["schemas"]["Amount"];
         };
         /** @enum {string} */
-        BuildingKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer" | "solar_plant" | "metal_storage" | "crystal_storage" | "deuterium_tank";
+        BuildingKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer" | "solar_plant" | "metal_storage" | "crystal_storage" | "deuterium_tank" | "shipyard";
         /**
          * @description Energy is not stored and does not count up. If used is more than
          *     produced, each mine produces only produced / used of its production
@@ -251,12 +299,14 @@ export interface components {
             level: number;
             /**
              * @description What this building adds per hour, at its level, after the energy
-             *     factor and without the base income. 0 for the solar plant and the storage.
+             *     factor and without the base income. 0 for the solar plant, the storage,
+             *     and the shipyard.
              */
             production_per_hour: components["schemas"]["Amount"];
             /**
              * @description What this building produces and uses, at its level. A mine has
-             *     produced 0. The solar plant has used 0. The storage has 0 and 0.
+             *     produced 0. The solar plant has used 0. The storage and the shipyard
+             *     have 0 and 0.
              */
             energy: components["schemas"]["Energy"];
             /** @description The cost of the next level. */
@@ -270,6 +320,45 @@ export interface components {
         };
         BuildingUpgrade: {
             building: components["schemas"]["Building"];
+            vault: components["schemas"]["Vault"];
+        };
+        /** @enum {string} */
+        ShipKind: "small_cargo" | "light_fighter";
+        Ship: {
+            kind: components["schemas"]["ShipKind"];
+            /** @description The complete ships of this kind on the planet. */
+            count: number;
+            /** @description The cost of one ship. */
+            cost: components["schemas"]["Resources"];
+            /** @description The build time of one ship, at the shipyard level of now. */
+            build_seconds: number;
+        };
+        ShipOrder: {
+            kind: components["schemas"]["ShipKind"];
+            /** @description The ships of the order that are not complete yet. */
+            remaining: number;
+            /**
+             * Format: date-time
+             * @description At this time, the next ship is complete.
+             */
+            next_finishes_at: string;
+            /**
+             * Format: date-time
+             * @description At this time, the last ship of the order is complete.
+             */
+            finishes_at: string;
+        };
+        Shipyard: {
+            /** @description Always two ships, in the order small_cargo, light_fighter. */
+            ships: components["schemas"]["Ship"][];
+            /** @description Only if a ship order runs on the planet. */
+            order?: components["schemas"]["ShipOrder"];
+        };
+        ShipOrderRequest: {
+            count: number;
+        };
+        ShipOrderResult: {
+            shipyard: components["schemas"]["Shipyard"];
             vault: components["schemas"]["Vault"];
         };
         /**
@@ -299,6 +388,7 @@ export interface components {
     parameters: {
         PlanetId: string;
         BuildingKind: components["schemas"]["BuildingKind"];
+        ShipKind: components["schemas"]["ShipKind"];
     };
     requestBodies: never;
     headers: never;
@@ -602,7 +692,99 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The planet ID is not a UUID, or the kind is not one of the seven building kinds. */
+            /** @description The planet ID is not a UUID, or the kind is not one of the eight building kinds. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_shipyard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The shipyard of the planet. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Shipyard"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["PlanetNotFound"];
+            /** @description The planet ID is not a UUID. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    order_ships: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+                kind: components["parameters"]["ShipKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description The shipyard with the new order, and the vault after the cost. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipOrderResult"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["PlanetNotFound"];
+            /** @description The shipyard has level 0, a ship order runs on the planet, or the vault has too little for the cost. Nothing changes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The planet ID is not a UUID, the kind is not a ship kind, or the count is not from 1 to 1000. */
             422: {
                 headers: {
                     [name: string]: unknown;

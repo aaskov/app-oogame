@@ -8,6 +8,7 @@ from app.shared.orm.base import Base
 from app.shared.orm.buildings import BUILDING_KINDS, MINE_KINDS, STORAGE_KINDS, BuildingRow
 from app.shared.orm.constructions import ConstructionRow
 from app.shared.orm.planets import HOME_PLANET_NAME, PlanetRow
+from app.shared.orm.ships import SHIP_KINDS, ShipOrderRow, ShipRow
 from app.shared.orm.users import UserRow
 from app.shared.orm.vaults import START_CRYSTAL, START_DEUTERIUM, START_METAL, VaultRow
 
@@ -15,6 +16,7 @@ __all__ = [
     "BUILDING_KINDS",
     "HOME_PLANET_NAME",
     "MINE_KINDS",
+    "SHIP_KINDS",
     "START_CRYSTAL",
     "START_DEUTERIUM",
     "START_METAL",
@@ -23,6 +25,8 @@ __all__ = [
     "BuildingRow",
     "ConstructionRow",
     "PlanetRow",
+    "ShipOrderRow",
+    "ShipRow",
     "UserRow",
     "VaultRow",
 ]

@@ -15,6 +15,7 @@ const BUILDING_NAMES: Record<BuildingKind, string> = {
   metal_storage: "Metal storage",
   crystal_storage: "Crystal storage",
   deuterium_tank: "Deuterium tank",
+  shipyard: "Shipyard",
 };
 
 function format(value: number) {

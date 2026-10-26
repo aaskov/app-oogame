@@ -5,11 +5,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.orm.base import Base
 
-# The building kinds that exist today (docs/adr/0111, 0112, 0113). A new
+# The building kinds that exist today (docs/adr/0111, 0112, 0113, 0115). A new
 # kind needs a migration that changes the check constraint.
 MINE_KINDS = ("metal_mine", "crystal_mine", "deuterium_synthesizer")
 STORAGE_KINDS = ("metal_storage", "crystal_storage", "deuterium_tank")
-BUILDING_KINDS = (*MINE_KINDS, "solar_plant", *STORAGE_KINDS)
+BUILDING_KINDS = (*MINE_KINDS, "solar_plant", *STORAGE_KINDS, "shipyard")
 
 
 class BuildingRow(Base):
@@ -19,7 +19,7 @@ class BuildingRow(Base):
     __table_args__ = (
         CheckConstraint(
             "kind IN ('metal_mine', 'crystal_mine', 'deuterium_synthesizer', 'solar_plant', "
-            "'metal_storage', 'crystal_storage', 'deuterium_tank')",
+            "'metal_storage', 'crystal_storage', 'deuterium_tank', 'shipyard')",
             name="known_kind",
         ),
         CheckConstraint("level >= 0", name="level_not_negative"),

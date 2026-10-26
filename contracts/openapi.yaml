@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.8.1
+  version: 0.9.0
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -161,12 +161,13 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: list_buildings
-      summary: List the seven buildings of one planet of the logged-in user.
+      x-planned: true
+      summary: List the eight buildings of one planet of the logged-in user.
       description: |
-        Always seven buildings, in the order metal_mine, crystal_mine,
+        Always eight buildings, in the order metal_mine, crystal_mine,
         deuterium_synthesizer, solar_plant, metal_storage, crystal_storage,
-        deuterium_tank. A building that was never upgraded has level 0
-        (docs/adr/0112, docs/adr/0113).
+        deuterium_tank, shipyard. A building that was never upgraded has
+        level 0 (docs/adr/0112, docs/adr/0113, docs/adr/0115).
       responses:
         "200":
           description: The buildings of the planet.
@@ -193,6 +194,7 @@ paths:
       - $ref: "#/components/parameters/BuildingKind"
     post:
       operationId: upgrade_building
+      x-planned: true
       summary: Start the upgrade of one building by one level. It costs resources from the vault.
       description: |
         The server first completes an upgrade that is due and adds the
@@ -223,7 +225,77 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "422":
-          description: The planet ID is not a UUID, or the kind is not one of the seven building kinds.
+          description: The planet ID is not a UUID, or the kind is not one of the eight building kinds.
+
+  /planets/{planet_id}/ships:
+    parameters:
+      - $ref: "#/components/parameters/PlanetId"
+    get:
+      operationId: read_shipyard
+      x-planned: true
+      summary: Show the ships and the running ship order of one planet of the logged-in user.
+      description: |
+        The server first completes the ships that are due (docs/adr/0115).
+      responses:
+        "200":
+          description: The shipyard of the planet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipyard"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/PlanetNotFound"
+        "422":
+          description: The planet ID is not a UUID.
+
+  /planets/{planet_id}/ships/{kind}/order:
+    parameters:
+      - $ref: "#/components/parameters/PlanetId"
+      - $ref: "#/components/parameters/ShipKind"
+    post:
+      operationId: order_ships
+      x-planned: true
+      summary: Start an order of a number of ships of one kind. It costs resources from the vault.
+      description: |
+        The server first completes the ships that are due and adds the
+        production up to now. Then it subtracts the cost of all the ships and
+        starts the order, in one transaction. The ships are complete one by
+        one (docs/adr/0115). A planet has at most one running ship order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShipOrderRequest"
+      responses:
+        "200":
+          description: The shipyard with the new order, and the vault after the cost.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipOrderResult"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/PlanetNotFound"
+        "409":
+          description: The shipyard has level 0, a ship order runs on the planet, or the vault has too little for the cost. Nothing changes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: The planet ID is not a UUID, the kind is not a ship kind, or the count is not from 1 to 1000.
 
 components:
   parameters:
@@ -241,6 +313,13 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/BuildingKind"
+
+    ShipKind:
+      name: kind
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/ShipKind"
 
   responses:
     PlanetNotFound:
@@ -337,7 +416,7 @@ components:
 
     BuildingKind:
       type: string
-      enum: [metal_mine, crystal_mine, deuterium_synthesizer, solar_plant, metal_storage, crystal_storage, deuterium_tank]
+      enum: [metal_mine, crystal_mine, deuterium_synthesizer, solar_plant, metal_storage, crystal_storage, deuterium_tank, shipyard]
 
     Energy:
       description: |
@@ -366,12 +445,14 @@ components:
         production_per_hour:
           description: |
             What this building adds per hour, at its level, after the energy
-            factor and without the base income. 0 for the solar plant and the storage.
+            factor and without the base income. 0 for the solar plant, the storage,
+            and the shipyard.
           $ref: "#/components/schemas/Amount"
         energy:
           description: |
             What this building produces and uses, at its level. A mine has
-            produced 0. The solar plant has used 0. The storage has 0 and 0.
+            produced 0. The solar plant has used 0. The storage and the shipyard
+            have 0 and 0.
           $ref: "#/components/schemas/Energy"
         upgrade_cost:
           description: The cost of the next level.
@@ -389,6 +470,78 @@ components:
       properties:
         building:
           $ref: "#/components/schemas/Building"
+        vault:
+          $ref: "#/components/schemas/Vault"
+
+    ShipKind:
+      type: string
+      enum: [small_cargo, light_fighter]
+
+    Ship:
+      type: object
+      required: [kind, count, cost, build_seconds]
+      properties:
+        kind:
+          $ref: "#/components/schemas/ShipKind"
+        count:
+          description: The complete ships of this kind on the planet.
+          type: integer
+          minimum: 0
+        cost:
+          description: The cost of one ship.
+          $ref: "#/components/schemas/Resources"
+        build_seconds:
+          description: The build time of one ship, at the shipyard level of now.
+          type: integer
+          minimum: 1
+
+    ShipOrder:
+      type: object
+      required: [kind, remaining, next_finishes_at, finishes_at]
+      properties:
+        kind:
+          $ref: "#/components/schemas/ShipKind"
+        remaining:
+          description: The ships of the order that are not complete yet.
+          type: integer
+          minimum: 1
+        next_finishes_at:
+          description: At this time, the next ship is complete.
+          type: string
+          format: date-time
+        finishes_at:
+          description: At this time, the last ship of the order is complete.
+          type: string
+          format: date-time
+
+    Shipyard:
+      type: object
+      required: [ships]
+      properties:
+        ships:
+          description: Always two ships, in the order small_cargo, light_fighter.
+          type: array
+          items:
+            $ref: "#/components/schemas/Ship"
+        order:
+          description: Only if a ship order runs on the planet.
+          $ref: "#/components/schemas/ShipOrder"
+
+    ShipOrderRequest:
+      type: object
+      required: [count]
+      properties:
+        count:
+          type: integer
+          minimum: 1
+          maximum: 1000
+
+    ShipOrderResult:
+      type: object
+      required: [shipyard, vault]
+      properties:
+        shipyard:
+          $ref: "#/components/schemas/Shipyard"
         vault:
           $ref: "#/components/schemas/Vault"
 
