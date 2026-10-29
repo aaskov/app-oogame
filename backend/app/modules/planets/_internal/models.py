@@ -13,6 +13,7 @@ BuildingKind = Literal[
     "metal_storage",
     "crystal_storage",
     "deuterium_tank",
+    "shipyard",
 ]
 # The order of the contract (docs/adr/0113).
 BUILDING_ORDER: tuple[BuildingKind, ...] = (
@@ -23,7 +24,12 @@ BUILDING_ORDER: tuple[BuildingKind, ...] = (
     "metal_storage",
     "crystal_storage",
     "deuterium_tank",
+    "shipyard",
 )
+
+ShipKind = Literal["small_cargo", "light_fighter"]
+# The order of the contract (docs/adr/0115).
+SHIP_ORDER: tuple[ShipKind, ...] = ("small_cargo", "light_fighter")
 
 
 @dataclass(frozen=True)
@@ -89,4 +95,42 @@ class Building:
 @dataclass(frozen=True)
 class BuildingUpgrade:
     building: Building
+    vault: Vault
+
+
+@dataclass(frozen=True)
+class Ship:
+    kind: ShipKind
+    count: int
+    cost: Resources
+    build_seconds: int
+
+
+@dataclass(frozen=True)
+class StoredShipOrder:
+    """The one running ship order of a planet, as stored (docs/adr/0115)."""
+
+    kind: ShipKind
+    remaining: int
+    seconds_per_ship: int
+    next_finishes_at: datetime
+
+
+@dataclass(frozen=True)
+class ShipOrder:
+    kind: ShipKind
+    remaining: int
+    next_finishes_at: datetime
+    finishes_at: datetime
+
+
+@dataclass(frozen=True)
+class Shipyard:
+    ships: list[Ship]
+    order: ShipOrder | None = None
+
+
+@dataclass(frozen=True)
+class ShipOrderResult:
+    shipyard: Shipyard
     vault: Vault

@@ -16,7 +16,9 @@ BuildingKind = Literal[
     "metal_storage",
     "crystal_storage",
     "deuterium_tank",
+    "shipyard",
 ]
+ShipKind = Literal["small_cargo", "light_fighter"]
 
 
 class PlanetOut(BaseModel):
@@ -70,6 +72,43 @@ class BuildingUpgradeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     building: BuildingOut
+    vault: VaultOut
+
+
+class ShipOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: ShipKind
+    count: int = Field(ge=0)
+    cost: ResourcesOut
+    build_seconds: int = Field(ge=1)
+
+
+class ShipOrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: ShipKind
+    remaining: int = Field(ge=1)
+    next_finishes_at: datetime
+    finishes_at: datetime
+
+
+class ShipyardOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    ships: list[ShipOut]
+    # Absent, not null, without a running order (docs/adr/0110, docs/adr/0115).
+    order: ShipOrderOut | SkipJsonSchema[None] = None
+
+
+class ShipOrderRequest(BaseModel):
+    count: int = Field(ge=1, le=1000)
+
+
+class ShipOrderResultOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    shipyard: ShipyardOut
     vault: VaultOut
 
 
