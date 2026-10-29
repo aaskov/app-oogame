@@ -11,6 +11,7 @@ import {
   colony,
   fakeFetch,
   homeworld,
+  shipyard,
   vault,
 } from "@/components/planets/fakeFetch";
 import { AuthContext, useAuthState } from "@/hooks/useAuth";
@@ -57,6 +58,7 @@ describe("PlanetsPage", () => {
       "GET /planets": { status: 200, body: [homeworld, colony] },
       [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault },
       [`GET /planets/${homeworld.id}/buildings`]: { status: 200, body: buildings },
+      [`GET /planets/${homeworld.id}/ships`]: { status: 200, body: shipyard },
     });
 
     expect(await screen.findByRole("button", { name: "Homeworld" })).toBeTruthy();
@@ -73,11 +75,13 @@ describe("PlanetsPage", () => {
       "GET /planets": { status: 200, body: [homeworld, colony] },
       [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault },
       [`GET /planets/${homeworld.id}/buildings`]: { status: 200, body: buildings },
+      [`GET /planets/${homeworld.id}/ships`]: { status: 200, body: shipyard },
       [`GET /planets/${colony.id}/vault`]: {
         status: 200,
         body: { ...vault, planet_id: colony.id, metal: 42 },
       },
       [`GET /planets/${colony.id}/buildings`]: { status: 200, body: buildings },
+      [`GET /planets/${colony.id}/ships`]: { status: 200, body: shipyard },
     });
 
     await screen.findByText("Metal");
@@ -94,6 +98,7 @@ describe("PlanetsPage", () => {
       "GET /planets": { status: 200, body: [homeworld] },
       [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault },
       [`GET /planets/${homeworld.id}/buildings`]: { status: 200, body: buildings },
+      [`GET /planets/${homeworld.id}/ships`]: { status: 200, body: shipyard },
     });
 
     expect(await screen.findByText("Solar plant")).toBeTruthy();
@@ -120,6 +125,7 @@ describe("PlanetsPage", () => {
           status: 200,
           body: buildingUpgrade,
         },
+        [`GET /planets/${homeworld.id}/ships`]: { status: 200, body: shipyard },
       },
       seen,
     );
@@ -150,6 +156,7 @@ describe("PlanetsPage", () => {
           { status: 200, body: buildingsUpgrading },
           { status: 200, body: buildingsAfterUpgrade },
         ],
+        [`GET /planets/${homeworld.id}/ships`]: { status: 200, body: shipyard },
       },
       seen,
     );

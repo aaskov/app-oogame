@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useBuildings } from "@/hooks/useBuildings";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -55,17 +55,23 @@ export function BuildingsView({
   amounts,
   onUpgraded,
   onCountdownComplete,
+  onBuildingsChanged,
 }: {
   planetId: string | null;
   client?: typeof api;
   amounts: Amounts | null;
   onUpgraded: (vault: Vault) => void;
   onCountdownComplete: () => void;
+  onBuildingsChanged?: (buildings: Building[]) => void;
 }) {
   const { buildings, loading, error, upgrade, reload } = useBuildings(planetId, client);
   const [actionError, setActionError] = useState<{ status: number; detail?: string } | null>(null);
   const [pending, setPending] = useState<BuildingKind | null>(null);
   const [actionPlanetId, setActionPlanetId] = useState(planetId);
+
+  useEffect(() => {
+    onBuildingsChanged?.(buildings);
+  }, [buildings, onBuildingsChanged]);
 
   if (planetId !== actionPlanetId) {
     setActionPlanetId(planetId);

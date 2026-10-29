@@ -1,15 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { BuildingsView } from "@/components/planets/BuildingsView";
 import { PlanetList } from "@/components/planets/PlanetList";
+import { ShipyardView } from "@/components/planets/ShipyardView";
 import { VaultView } from "@/components/planets/VaultView";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlanets } from "@/hooks/usePlanets";
 import { useVault } from "@/hooks/useVault";
-import type { api } from "@/lib/api";
+import type { api, Building } from "@/lib/api";
 
 export function PlanetsPage({ client }: { client?: typeof api }) {
   const { user, loading: authLoading } = useAuth();
@@ -17,6 +18,10 @@ export function PlanetsPage({ client }: { client?: typeof api }) {
   const { planets, loading: planetsLoading } = usePlanets(client);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoSelected, setAutoSelected] = useState(false);
+  const [shipyardLevel, setShipyardLevel] = useState(0);
+  const handleBuildingsChanged = useCallback((buildings: Building[]) => {
+    setShipyardLevel(buildings.find((building) => building.kind === "shipyard")?.level ?? 0);
+  }, []);
   const {
     vault,
     amounts,
@@ -52,6 +57,14 @@ export function PlanetsPage({ client }: { client?: typeof api }) {
         amounts={amounts}
         onUpgraded={setVault}
         onCountdownComplete={reloadVault}
+        onBuildingsChanged={handleBuildingsChanged}
+      />
+      <ShipyardView
+        planetId={selectedId}
+        client={client}
+        amounts={amounts}
+        shipyardLevel={shipyardLevel}
+        onOrdered={setVault}
       />
     </main>
   );
