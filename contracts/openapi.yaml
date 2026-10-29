@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.9.0
+  version: 0.9.1
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -161,7 +161,6 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: list_buildings
-      x-planned: true
       summary: List the eight buildings of one planet of the logged-in user.
       description: |
         Always eight buildings, in the order metal_mine, crystal_mine,
@@ -194,7 +193,6 @@ paths:
       - $ref: "#/components/parameters/BuildingKind"
     post:
       operationId: upgrade_building
-      x-planned: true
       summary: Start the upgrade of one building by one level. It costs resources from the vault.
       description: |
         The server first completes an upgrade that is due and adds the
@@ -232,7 +230,6 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: read_shipyard
-      x-planned: true
       summary: Show the ships and the running ship order of one planet of the logged-in user.
       description: |
         The server first completes the ships that are due (docs/adr/0115).
@@ -260,7 +257,6 @@ paths:
       - $ref: "#/components/parameters/ShipKind"
     post:
       operationId: order_ships
-      x-planned: true
       summary: Start an order of a number of ships of one kind. It costs resources from the vault.
       description: |
         The server first completes the ships that are due and adds the
