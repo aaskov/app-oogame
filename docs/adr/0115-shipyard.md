@@ -61,7 +61,8 @@ In OGame, a shipyard builds ships. Ships are the base for fleets later.
 
 - `list_buildings` and `upgrade_building` are `x-planned` in the prep,
   because `BuildingKind` gets `shipyard`. `read_shipyard` and `order_ships`
-  are new and `x-planned`. The cleanup removes the flags.
+  are new and `x-planned`. The cleanup removes the flags (done after #63
+  and #64).
 - The prep adds the label of the shipyard to the frontend, so that the type
   check passes. The new schemas are exported in `frontend/src/lib/api.ts`
   (lesson 17).
