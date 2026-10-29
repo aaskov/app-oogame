@@ -26,6 +26,7 @@ BUILDING_ORDER_WITH_STORAGE = [
     "metal_storage",
     "crystal_storage",
     "deuterium_tank",
+    "shipyard",
 ]
 
 
@@ -61,14 +62,14 @@ def set_vault(
 # --- Capacity values and calculations ------------------------------------------
 
 
-def test_list_buildings_returns_seven_buildings_in_order(client: TestClient) -> None:
+def test_list_buildings_returns_eight_buildings_in_order(client: TestClient) -> None:
     planet_id = home_planet(client)
 
     response = client.get(f"/planets/{planet_id}/buildings")
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 7
+    assert len(body) == 8
     assert [building["kind"] for building in body] == BUILDING_ORDER_WITH_STORAGE
 
 

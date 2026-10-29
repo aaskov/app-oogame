@@ -10,6 +10,9 @@ from app.modules.planets._internal.models import (
     BuildingKind,
     BuildingUpgrade,
     Planet,
+    ShipKind,
+    ShipOrderResult,
+    Shipyard,
     Vault,
 )
 from app.modules.planets._internal.schemas import (
@@ -17,11 +20,16 @@ from app.modules.planets._internal.schemas import (
     BuildingUpgradeOut,
     ErrorOut,
     PlanetOut,
+    ShipOrderRequest,
+    ShipOrderResultOut,
+    ShipyardOut,
     VaultOut,
 )
 from app.modules.planets._internal.service import (
     InsufficientResourcesError,
+    NoShipyardError,
     PlanetService,
+    ShipOrderRunningError,
     UpgradeRunningError,
 )
 
@@ -88,6 +96,48 @@ def upgrade_building(
     try:
         result = service.upgrade_building(planet_id, user_id, kind)
     except (InsufficientResourcesError, UpgradeRunningError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    if result is None:
+        raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
+    return result
+
+
+@router.get(
+    "/{planet_id}/ships",
+    operation_id="read_shipyard",
+    response_model=ShipyardOut,
+    response_model_exclude_none=True,
+    responses={401: {"model": ErrorOut}, 404: {"model": ErrorOut}, 422: {}},
+)
+def read_shipyard(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> Shipyard:
+    shipyard = service.read_shipyard(planet_id, user_id)
+    if shipyard is None:
+        raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
+    return shipyard
+
+
+@router.post(
+    "/{planet_id}/ships/{kind}/order",
+    operation_id="order_ships",
+    response_model=ShipOrderResultOut,
+    response_model_exclude_none=True,
+    responses={
+        401: {"model": ErrorOut},
+        404: {"model": ErrorOut},
+        409: {"model": ErrorOut},
+        422: {},
+    },
+)
+def order_ships(
+    planet_id: UUID,
+    kind: ShipKind,
+    body: ShipOrderRequest,
+    user_id: UserIdDep,
+    service: ServiceDep,
+) -> ShipOrderResult:
+    try:
+        result = service.order_ships(planet_id, user_id, kind, body.count)
+    except (NoShipyardError, ShipOrderRunningError, InsufficientResourcesError) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     if result is None:
         raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)

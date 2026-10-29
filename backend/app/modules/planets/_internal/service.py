@@ -6,6 +6,7 @@ from uuid import UUID
 from app.modules.planets._internal.models import (
     BUILDING_ORDER,
     MAX_AMOUNT,
+    SHIP_ORDER,
     Building,
     BuildingKind,
     BuildingUpgrade,
@@ -13,6 +14,12 @@ from app.modules.planets._internal.models import (
     Energy,
     Planet,
     Resources,
+    Ship,
+    ShipKind,
+    ShipOrder,
+    ShipOrderResult,
+    Shipyard,
+    StoredShipOrder,
     StoredVault,
     Vault,
 )
@@ -46,6 +53,15 @@ _UPGRADE_COST: dict[BuildingKind, tuple[float, float, float]] = {
     "metal_storage": (1000, 0, 2.0),
     "crystal_storage": (1000, 500, 2.0),
     "deuterium_tank": (1000, 1000, 2.0),
+    "shipyard": (400, 200, 2.0),
+}
+# The deuterium base of the next level's cost. Only the shipyard has one (docs/adr/0115).
+_UPGRADE_DEUTERIUM: dict[BuildingKind, float] = {"shipyard": 100}
+
+# The cost of one ship (docs/adr/0115).
+_SHIP_COST: dict[ShipKind, Resources] = {
+    "small_cargo": Resources(metal=2000, crystal=2000, deuterium=0),
+    "light_fighter": Resources(metal=3000, crystal=1000, deuterium=0),
 }
 
 
@@ -55,6 +71,14 @@ class InsufficientResourcesError(Exception):
 
 class UpgradeRunningError(Exception):
     """An upgrade already runs on the planet (docs/adr/0114)."""
+
+
+class NoShipyardError(Exception):
+    """The shipyard has level 0 (docs/adr/0115)."""
+
+
+class ShipOrderRunningError(Exception):
+    """A ship order already runs on the planet (docs/adr/0115)."""
 
 
 def _clamp(amount: int) -> int:
@@ -94,13 +118,21 @@ def _upgrade_cost(kind: BuildingKind, level: int) -> Resources:
     return Resources(
         metal=_clamp(math.floor(metal_base * ratio**level)),
         crystal=_clamp(math.floor(crystal_base * ratio**level)),
-        deuterium=0,
+        deuterium=_clamp(math.floor(_UPGRADE_DEUTERIUM.get(kind, 0) * ratio**level)),
     )
 
 
 def _build_time_seconds(cost: Resources, game_speed: float) -> int:
     """Seconds, rounded down, at least 1 (docs/adr/0114)."""
     return max(1, math.floor(3600 * (cost.metal + cost.crystal) / 2500 / game_speed))
+
+
+def _ship_build_seconds(cost: Resources, shipyard_level: int, game_speed: float) -> int:
+    """Seconds for one ship, rounded down, at least 1 (docs/adr/0115)."""
+    return max(
+        1,
+        math.floor(3600 * (cost.metal + cost.crystal) / 2500 / (1 + shipyard_level) / game_speed),
+    )
 
 
 def _vault_production_per_hour(
@@ -213,6 +245,135 @@ class PlanetService:
         construction = Construction(kind=kind, finishes_at=finishes_at)
         new_vault = replace(vault, metal=metal, crystal=crystal, deuterium=deuterium)
         return BuildingUpgrade(building=self._building(kind, levels, construction), vault=new_vault)
+
+    def read_shipyard(self, planet_id: UUID, user_id: UUID) -> Shipyard | None:
+        if not self._repository.planet_owned_by(planet_id, user_id):
+            return None
+        self._complete_due(planet_id, user_id)
+        self._complete_due_ships(planet_id, user_id)
+        return self._shipyard(planet_id)
+
+    def order_ships(
+        self, planet_id: UUID, user_id: UUID, kind: ShipKind, count: int
+    ) -> ShipOrderResult | None:
+        """Start a ship order: the five steps of docs/adr/0115, in one transaction.
+
+        Raises NoShipyardError, ShipOrderRunningError, or InsufficientResourcesError.
+        Each of them rolls back. Returns the shipyard with the new order and the
+        vault after the cost.
+        """
+        vault_row = self._repository.lock_vault(planet_id, user_id)
+        if vault_row is None:
+            return None
+        # A due shipyard upgrade changes the level and the stored vault.
+        vault_row, _ = self._complete_due_locked(planet_id, vault_row)
+        running = self._complete_due_ships_locked(planet_id)
+
+        levels = self._repository.get_building_levels(planet_id)
+        shipyard_level = levels.get("shipyard", 0)
+        if shipyard_level == 0:
+            self._repository.rollback()
+            raise NoShipyardError("The shipyard has level 0")
+        if running is not None:
+            self._repository.rollback()
+            raise ShipOrderRunningError("A ship order is already running on the planet")
+
+        vault = self._vault_from_row(vault_row, levels, self._now)
+        unit = _SHIP_COST[kind]
+        cost = Resources(
+            metal=unit.metal * count,
+            crystal=unit.crystal * count,
+            deuterium=unit.deuterium * count,
+        )
+        if (
+            vault.metal < cost.metal
+            or vault.crystal < cost.crystal
+            or vault.deuterium < cost.deuterium
+        ):
+            self._repository.rollback()
+            raise InsufficientResourcesError("Not enough resources for the ships")
+
+        seconds_per_ship = _ship_build_seconds(unit, shipyard_level, self._settings.game_speed)
+        metal = vault.metal - cost.metal
+        crystal = vault.crystal - cost.crystal
+        deuterium = vault.deuterium - cost.deuterium
+        # Never store a time before the stored time (docs/adr/0111).
+        stored_at = max(self._now, vault_row.updated_at)
+        self._repository.update_vault_amounts(planet_id, metal, crystal, deuterium, stored_at)
+        self._repository.add_ship_order(
+            planet_id,
+            kind,
+            count,
+            seconds_per_ship,
+            self._now + timedelta(seconds=seconds_per_ship),
+        )
+        self._repository.commit()
+
+        new_vault = replace(vault, metal=metal, crystal=crystal, deuterium=deuterium)
+        return ShipOrderResult(shipyard=self._shipyard(planet_id), vault=new_vault)
+
+    def _complete_due_ships(self, planet_id: UUID, user_id: UUID) -> None:
+        """Complete the ships that are due, before a read (docs/adr/0115).
+
+        Takes the vault lock only if a ship is due. Another request can
+        complete the ships while this one waits, so the row is read again after the lock.
+        """
+        order = self._repository.get_ship_order(planet_id)
+        if order is None or order.next_finishes_at > self._now:
+            return
+        if self._repository.lock_vault(planet_id, user_id) is None:
+            return
+        self._complete_due_ships_locked(planet_id)
+        self._repository.commit()
+
+    def _complete_due_ships_locked(self, planet_id: UUID) -> StoredShipOrder | None:
+        """Add the due ships to the count, with the vault lock held. The caller commits.
+
+        Returns the order that still runs, if any.
+        """
+        order = self._repository.get_ship_order(planet_id)
+        if order is None or order.next_finishes_at > self._now:
+            return order
+        overdue = (self._now - order.next_finishes_at).total_seconds()
+        done = min(order.remaining, 1 + math.floor(overdue / order.seconds_per_ship))
+        self._repository.add_ships(planet_id, order.kind, done)
+        if done == order.remaining:
+            self._repository.delete_ship_order(planet_id)
+            return None
+        next_finishes_at = order.next_finishes_at + timedelta(seconds=done * order.seconds_per_ship)
+        self._repository.update_ship_order(planet_id, order.remaining - done, next_finishes_at)
+        return replace(
+            order, remaining=order.remaining - done, next_finishes_at=next_finishes_at
+        )
+
+    def _shipyard(self, planet_id: UUID) -> Shipyard:
+        levels = self._repository.get_building_levels(planet_id)
+        counts = self._repository.get_ship_counts(planet_id)
+        shipyard_level = levels.get("shipyard", 0)
+        ships = [
+            Ship(
+                kind=kind,
+                count=counts.get(kind, 0),
+                cost=_SHIP_COST[kind],
+                build_seconds=_ship_build_seconds(
+                    _SHIP_COST[kind], shipyard_level, self._settings.game_speed
+                ),
+            )
+            for kind in SHIP_ORDER
+        ]
+        stored = self._repository.get_ship_order(planet_id)
+        order = (
+            ShipOrder(
+                kind=stored.kind,
+                remaining=stored.remaining,
+                next_finishes_at=stored.next_finishes_at,
+                finishes_at=stored.next_finishes_at
+                + timedelta(seconds=(stored.remaining - 1) * stored.seconds_per_ship),
+            )
+            if stored is not None
+            else None
+        )
+        return Shipyard(ships=ships, order=order)
 
     def _complete_due(self, planet_id: UUID, user_id: UUID) -> None:
         """Complete an upgrade that is due, before a read (docs/adr/0114).

@@ -5,10 +5,17 @@ from sqlalchemy import delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.modules.planets._internal.models import Construction, Planet, StoredVault
+from app.modules.planets._internal.models import (
+    Construction,
+    Planet,
+    ShipKind,
+    StoredShipOrder,
+    StoredVault,
+)
 from app.shared.orm.buildings import BuildingRow
 from app.shared.orm.constructions import ConstructionRow
 from app.shared.orm.planets import HOME_PLANET_NAME, PlanetRow
+from app.shared.orm.ships import ShipOrderRow, ShipRow
 from app.shared.orm.vaults import START_CRYSTAL, START_DEUTERIUM, START_METAL, VaultRow
 
 
@@ -24,6 +31,11 @@ def _to_stored_vault(row: VaultRow) -> StoredVault:
         deuterium=row.deuterium,
         updated_at=row.updated_at,
     )
+
+
+def _to_ship_kind(kind: str) -> ShipKind:
+    # The check constraint known_kind allows only these two values.
+    return "small_cargo" if kind == "small_cargo" else "light_fighter"
 
 
 class PlanetRepository:
@@ -130,6 +142,71 @@ class PlanetRepository:
 
     def delete_construction(self, planet_id: UUID) -> None:
         self._session.execute(delete(ConstructionRow).where(ConstructionRow.planet_id == planet_id))
+
+    def get_ship_counts(self, planet_id: UUID) -> dict[str, int]:
+        # populate_existing: after the vault lock, read what the other request committed.
+        rows = self._session.scalars(
+            select(ShipRow)
+            .where(ShipRow.planet_id == planet_id)
+            .execution_options(populate_existing=True)
+        )
+        return {row.kind: row.count for row in rows}
+
+    def add_ships(self, planet_id: UUID, kind: ShipKind, number: int) -> None:
+        statement = insert(ShipRow).values(planet_id=planet_id, kind=kind, count=number)
+        self._session.execute(
+            statement.on_conflict_do_update(
+                index_elements=["planet_id", "kind"],
+                set_={"count": ShipRow.count + number},
+            )
+        )
+
+    def get_ship_order(self, planet_id: UUID) -> StoredShipOrder | None:
+        # populate_existing: after the vault lock, read what the other request committed.
+        row = self._session.scalars(
+            select(ShipOrderRow)
+            .where(ShipOrderRow.planet_id == planet_id)
+            .execution_options(populate_existing=True)
+        ).one_or_none()
+        if row is None:
+            return None
+        return StoredShipOrder(
+            kind=_to_ship_kind(row.kind),
+            remaining=row.remaining,
+            seconds_per_ship=row.seconds_per_ship,
+            next_finishes_at=row.next_finishes_at,
+        )
+
+    def add_ship_order(
+        self,
+        planet_id: UUID,
+        kind: ShipKind,
+        remaining: int,
+        seconds_per_ship: int,
+        next_finishes_at: datetime,
+    ) -> None:
+        self._session.add(
+            ShipOrderRow(
+                planet_id=planet_id,
+                kind=kind,
+                remaining=remaining,
+                seconds_per_ship=seconds_per_ship,
+                next_finishes_at=next_finishes_at,
+            )
+        )
+        self._session.flush()
+
+    def update_ship_order(
+        self, planet_id: UUID, remaining: int, next_finishes_at: datetime
+    ) -> None:
+        self._session.execute(
+            update(ShipOrderRow)
+            .where(ShipOrderRow.planet_id == planet_id)
+            .values(remaining=remaining, next_finishes_at=next_finishes_at)
+        )
+
+    def delete_ship_order(self, planet_id: UUID) -> None:
+        self._session.execute(delete(ShipOrderRow).where(ShipOrderRow.planet_id == planet_id))
 
     def commit(self) -> None:
         self._session.commit()
