@@ -1,4 +1,4 @@
-import type { Building, BuildingUpgrade, Vault } from "@/lib/api";
+import type { Building, BuildingUpgrade, Ship, ShipOrderResult, Shipyard, Vault } from "@/lib/api";
 
 type Reply = { status: number; body?: unknown };
 type Route = Reply | Reply[];
@@ -113,6 +113,56 @@ export const buildingsUpgrading: Building[] = [
   buildings[5],
   buildings[6],
 ];
+
+export const ships: Ship[] = [
+  { kind: "small_cargo", count: 0, cost: { metal: 2000, crystal: 2000, deuterium: 0 }, build_seconds: 2880 },
+  { kind: "light_fighter", count: 0, cost: { metal: 3000, crystal: 1000, deuterium: 0 }, build_seconds: 3600 },
+];
+
+export const shipyard: Shipyard = { ships };
+
+// Three small cargos ordered at shipyard level 1 ("2026-10-19T00:00:00Z"),
+// one every 2880 seconds (docs/adr/0115).
+export const shipyardOrdering: Shipyard = {
+  ships,
+  order: {
+    kind: "small_cargo",
+    remaining: 3,
+    next_finishes_at: "2026-10-19T00:48:00Z",
+    finishes_at: "2026-10-19T02:24:00Z",
+  },
+};
+
+// The last small cargo of the order is due 2880 seconds after the system
+// time the tests set ("2026-10-19T00:00:00Z"), matching the example build
+// time of docs/adr/0115.
+export const shipyardOrderingLastShip: Shipyard = {
+  ships,
+  order: {
+    kind: "small_cargo",
+    remaining: 1,
+    next_finishes_at: "2026-10-19T00:48:00Z",
+    finishes_at: "2026-10-19T00:48:00Z",
+  },
+};
+
+export const shipyardAfterOrderComplete: Shipyard = {
+  ships: [{ ...ships[0], count: 3 }, ships[1]],
+};
+
+export const shipOrderResult: ShipOrderResult = {
+  shipyard: shipyardOrdering,
+  vault: {
+    planet_id: homeworld.id,
+    metal: 4000,
+    crystal: 4000,
+    deuterium: 0,
+    production_per_hour: { metal: 30, crystal: 15, deuterium: 0 },
+    energy: { produced: 22, used: 22 },
+    capacity: { metal: 10000, crystal: 10000, deuterium: 10000 },
+    calculated_at: "2026-10-19T00:00:00Z",
+  },
+};
 
 export function fakeFetch(routes: Record<string, Route>, seen: Request[] = []) {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
