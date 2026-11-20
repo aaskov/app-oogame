@@ -25,9 +25,10 @@ used these tasks for two features (auth and planets) before they moved here.
   token on the host, in `~/.config/claude-agent/oauth-token`. The container
   mounts the folder read-only. `.devcontainer/claude-auth.sh` puts a wrapper
   in front of `claude` that sets `CLAUDE_CODE_OAUTH_TOKEN` from the file.
-- **The model:** an agent uses `claude-sonnet-5-5`. `AGENT_MODEL=<model>`
-  overrides it for one start. The seed sets no model in `.claude/settings.json`,
-  so a session in the main checkout (the architect) keeps the Claude default.
+- **The model:** an agent uses the Claude default model of the subscription.
+  `agent:start` passes no `--model`, so the agents follow when the default
+  changes. `AGENT_MODEL=<model>` overrides it for one start. The seed sets no
+  model in `.claude/settings.json`.
 - **The permission mode:** an agent runs in `auto` mode, so it does not ask
   before each command. `AGENT_PERMISSION_MODE=<mode>` overrides it for one
   start, for example `default`. The guard hook, the Stop gate, `check:guarded`,
