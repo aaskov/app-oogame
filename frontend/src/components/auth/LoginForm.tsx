@@ -37,7 +37,7 @@ export function LoginForm() {
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="w-full rounded border border-zinc-400 px-3 py-2 text-base font-normal"
+          className="min-h-11 w-full rounded border border-border bg-surface px-3 py-2 text-base font-normal"
         />
       </label>
       <label className="flex flex-col gap-1 text-sm font-medium">
@@ -48,18 +48,18 @@ export function LoginForm() {
           required
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          className="w-full rounded border border-zinc-400 px-3 py-2 text-base font-normal"
+          className="min-h-11 w-full rounded border border-border bg-surface px-3 py-2 text-base font-normal"
         />
       </label>
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}
       <button
         type="submit"
         disabled={submitting}
-        className="rounded bg-zinc-900 px-4 py-3 text-base font-medium text-white disabled:opacity-60"
+        className="min-h-11 rounded bg-accent px-4 py-3 text-base font-medium text-white disabled:opacity-60"
       >
         Log in
       </button>

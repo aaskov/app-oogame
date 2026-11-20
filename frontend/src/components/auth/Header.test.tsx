@@ -38,7 +38,7 @@ describe("Header", () => {
     renderHeader({ "GET /auth/me": { status: 200, body: ada } });
 
     const planets = await screen.findByRole("link", { name: "Planets" });
-    expect(planets.getAttribute("href")).toBe("/planets");
+    expect(planets.getAttribute("href")).toBe("/homeworld");
   });
 
   it("shows no Planets link without a user", async () => {

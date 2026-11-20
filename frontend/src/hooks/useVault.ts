@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 import { api as defaultApi, type Vault } from "@/lib/api";
 
@@ -102,4 +102,19 @@ export function useVault(planetId: string | null, client: Api = defaultApi) {
   const amounts = vault ? amountsAt(vault, now) : null;
 
   return { vault, amounts, loading, error, setVault, reload };
+}
+
+export type VaultState = ReturnType<typeof useVault>;
+
+// The app frame (src/app/(game)/planets/[id]/layout.tsx) owns the one
+// useVault call for a planet, so the resource bar and the buildings/shipyard
+// pages share the same vault and amounts (docs/adr/0116).
+export const VaultContext = createContext<VaultState | null>(null);
+
+export function useVaultContext(): VaultState {
+  const value = useContext(VaultContext);
+  if (!value) {
+    throw new Error("useVaultContext must be used inside a VaultContext.Provider.");
+  }
+  return value;
 }

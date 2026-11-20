@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { useBuildings } from "@/hooks/useBuildings";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -55,23 +55,17 @@ export function BuildingsView({
   amounts,
   onUpgraded,
   onCountdownComplete,
-  onBuildingsChanged,
 }: {
   planetId: string | null;
   client?: typeof api;
   amounts: Amounts | null;
   onUpgraded: (vault: Vault) => void;
   onCountdownComplete: () => void;
-  onBuildingsChanged?: (buildings: Building[]) => void;
 }) {
   const { buildings, loading, error, upgrade, reload } = useBuildings(planetId, client);
   const [actionError, setActionError] = useState<{ status: number; detail?: string } | null>(null);
   const [pending, setPending] = useState<BuildingKind | null>(null);
   const [actionPlanetId, setActionPlanetId] = useState(planetId);
-
-  useEffect(() => {
-    onBuildingsChanged?.(buildings);
-  }, [buildings, onBuildingsChanged]);
 
   if (planetId !== actionPlanetId) {
     setActionPlanetId(planetId);
@@ -96,7 +90,7 @@ export function BuildingsView({
 
   if (error === 404) {
     return (
-      <p role="alert" className="text-sm text-red-600">
+      <p role="alert" className="text-sm text-danger">
         This planet was not found.
       </p>
     );
@@ -117,12 +111,12 @@ export function BuildingsView({
   return (
     <section aria-label="Buildings" className="flex flex-col gap-4">
       {actionError?.status === 409 && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {actionError.detail}
         </p>
       )}
       {actionError?.status === 404 && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           This planet was not found.
         </p>
       )}
@@ -140,29 +134,29 @@ export function BuildingsView({
           return (
             <li
               key={building.kind}
-              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-zinc-200 pb-3"
+              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border pb-3"
             >
               <div className="min-w-0">
                 <p className="font-medium">{name}</p>
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-muted">
                   {isMine
                     ? `Level ${building.level} · +${format(building.production_per_hour)}/h`
                     : `Level ${building.level}`}
                 </p>
                 {isUpgradingThis && countdownText && (
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-muted">
                     Upgrading to level {building.level + 1} · {countdownText}
                   </p>
                 )}
-                {!isStorage && <p className="text-sm text-zinc-500">{energyText(building.energy)}</p>}
-                <p className="text-sm text-zinc-500">{costText(building.upgrade_cost)}</p>
+                {!isStorage && <p className="text-sm text-muted">{energyText(building.energy)}</p>}
+                <p className="text-sm text-muted">{costText(building.upgrade_cost)}</p>
               </div>
               <button
                 type="button"
                 aria-label={`Upgrade ${name}`}
                 disabled={upgrading !== undefined || !affordable || pending === building.kind}
                 onClick={() => handleUpgrade(building.kind)}
-                className="rounded border border-zinc-900 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-300"
+                className="min-h-11 min-w-11 rounded border border-accent px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:border-border disabled:text-muted"
               >
                 {anotherUpgradeRuns ? "Another upgrade runs" : "Upgrade"}
               </button>
