@@ -84,7 +84,7 @@ export function ShipyardView({
 
   if (error === 404) {
     return (
-      <p role="alert" className="text-sm text-red-600">
+      <p role="alert" className="text-sm text-danger">
         This planet was not found.
       </p>
     );
@@ -110,12 +110,12 @@ export function ShipyardView({
   return (
     <section aria-label="Shipyard" className="flex flex-col gap-4">
       {actionError?.status === 409 && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {actionError.detail}
         </p>
       )}
       {actionError?.status === 404 && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           This planet was not found.
         </p>
       )}
@@ -130,20 +130,20 @@ export function ShipyardView({
           return (
             <li
               key={ship.kind}
-              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-zinc-200 pb-3"
+              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border pb-3"
             >
               <div className="min-w-0">
                 <p className="font-medium">{name}</p>
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-muted">
                   Built: {format(ship.count)} · {ship.build_seconds}s to build
                 </p>
                 {isOrderingThis && nextCountdownText && finishesCountdownText && (
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-muted">
                     Building · {runningOrder.remaining} left · next {nextCountdownText} · all{" "}
                     {finishesCountdownText}
                   </p>
                 )}
-                <p className="text-sm text-zinc-500">{costText(ship.cost)}</p>
+                <p className="text-sm text-muted">{costText(ship.cost)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -156,7 +156,7 @@ export function ShipyardView({
                   onChange={(e) =>
                     setCounts((prev) => ({ ...prev, [ship.kind]: Number(e.target.value) }))
                   }
-                  className="w-20 rounded border border-zinc-300 px-2 py-1 text-sm disabled:text-zinc-300"
+                  className="min-h-11 w-20 rounded border border-border px-2 py-1 text-sm disabled:text-muted"
                 />
                 <button
                   type="button"
@@ -168,7 +168,7 @@ export function ShipyardView({
                     pending === ship.kind
                   }
                   onClick={() => handleOrder(ship.kind)}
-                  className="rounded border border-zinc-900 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:border-zinc-300 disabled:text-zinc-300"
+                  className="min-h-11 min-w-11 rounded border border-accent px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:border-border disabled:text-muted"
                 >
                   {anotherOrderRuns ? "Another order runs" : "Order"}
                 </button>

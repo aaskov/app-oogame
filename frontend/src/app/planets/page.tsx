@@ -1,5 +1,8 @@
-import { PlanetsPage } from "@/components/planets/PlanetsPage";
+"use client";
+
+import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 
 export default function Page() {
-  return <PlanetsPage />;
+  useAuthRedirect();
+  return null;
 }

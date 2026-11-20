@@ -1,22 +1,40 @@
 @import "tailwindcss";
 
+/* Dark space theme (docs/adr/0116). The only theme: no prefers-color-scheme
+   switch. Each resource keeps the same color on every page. Every color here
+   reaches a 4.5:1 text contrast against --background (WCAG AA). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0f14;
+  --surface: #121821;
+  --border: #243040;
+  --foreground: #e5e7eb;
+  --muted: #94a3b8;
+  --accent: #0369a1;
+  --metal: #cbd5e1;
+  --crystal: #7dd3fc;
+  --deuterium: #86efac;
+  --energy: #fcd34d;
+  --danger: #f87171;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-metal: var(--metal);
+  --color-crystal: var(--crystal);
+  --color-deuterium: var(--deuterium);
+  --color-energy: var(--energy);
+  --color-danger: var(--danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
