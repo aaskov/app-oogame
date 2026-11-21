@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import GameLayout from "@/app/(game)/layout";
+import { GameFrame } from "@/app/(game)/GameFrame";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ada, fakeFetch } from "@/components/auth/fakeFetch";
 import { createApi } from "@/lib/api";
@@ -20,14 +20,14 @@ afterEach(() => {
 function renderLayout(routes: Parameters<typeof fakeFetch>[0]) {
   render(
     <AuthProvider api={createApi(fakeFetch(routes))}>
-      <GameLayout>
+      <GameFrame>
         <p>Content</p>
-      </GameLayout>
+      </GameFrame>
     </AuthProvider>,
   );
 }
 
-describe("GameLayout", () => {
+describe("GameFrame", () => {
   it("sends a user who is not logged in to /login, and renders nothing", async () => {
     renderLayout({ "GET /auth/me": { status: 401 } });
 
