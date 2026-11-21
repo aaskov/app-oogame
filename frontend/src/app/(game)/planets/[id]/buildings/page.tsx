@@ -1,5 +1,11 @@
+import { Suspense } from "react";
+
 import { BuildingsPage } from "@/components/planets/BuildingsPage";
 
 export default function Page() {
-  return <BuildingsPage />;
+  return (
+    <Suspense fallback={null}>
+      <BuildingsPage />
+    </Suspense>
+  );
 }

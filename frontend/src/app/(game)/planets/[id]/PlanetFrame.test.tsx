@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import PlanetLayout from "@/app/(game)/planets/[id]/layout";
+import { PlanetFrame } from "@/app/(game)/planets/[id]/PlanetFrame";
 import { fakeFetch, homeworld, vault } from "@/components/planets/fakeFetch";
 import { createApi } from "@/lib/api";
 
@@ -18,13 +18,13 @@ afterEach(() => {
 
 function renderLayout(routes: Parameters<typeof fakeFetch>[0]) {
   render(
-    <PlanetLayout client={createApi(fakeFetch(routes))}>
+    <PlanetFrame client={createApi(fakeFetch(routes))}>
       <p>Buildings content</p>
-    </PlanetLayout>,
+    </PlanetFrame>,
   );
 }
 
-describe("PlanetLayout", () => {
+describe("PlanetFrame", () => {
   it("renders the tabs, the content, and the resource bar", async () => {
     renderLayout({ [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault } });
 
