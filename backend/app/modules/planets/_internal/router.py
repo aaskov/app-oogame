@@ -10,9 +10,12 @@ from app.modules.planets._internal.models import (
     BuildingKind,
     BuildingUpgrade,
     Planet,
+    Research,
+    ResearchStart,
     ShipKind,
     ShipOrderResult,
     Shipyard,
+    TechKind,
     Vault,
 )
 from app.modules.planets._internal.schemas import (
@@ -20,6 +23,8 @@ from app.modules.planets._internal.schemas import (
     BuildingUpgradeOut,
     ErrorOut,
     PlanetOut,
+    ResearchOut,
+    ResearchStartOut,
     ShipOrderRequest,
     ShipOrderResultOut,
     ShipyardOut,
@@ -27,13 +32,18 @@ from app.modules.planets._internal.schemas import (
 )
 from app.modules.planets._internal.service import (
     InsufficientResourcesError,
+    NoLabError,
     NoShipyardError,
     PlanetService,
+    ResearchRunningError,
     ShipOrderRunningError,
+    TechnologyNotAvailableError,
     UpgradeRunningError,
 )
 
-router = APIRouter(prefix="/planets", tags=["planets"])
+router = APIRouter()
+planets_router = APIRouter(prefix="/planets", tags=["planets"])
+research_router = APIRouter(tags=["research"])
 
 ServiceDep = Annotated[PlanetService, Depends(get_planet_service)]
 UserIdDep = Annotated[UUID, Depends(get_current_user_id)]
@@ -41,7 +51,7 @@ UserIdDep = Annotated[UUID, Depends(get_current_user_id)]
 PLANET_NOT_FOUND = "Planet not found"
 
 
-@router.get(
+@planets_router.get(
     "",
     operation_id="list_planets",
     response_model=list[PlanetOut],
@@ -51,7 +61,7 @@ def list_planets(user_id: UserIdDep, service: ServiceDep) -> list[Planet]:
     return service.list_planets(user_id)
 
 
-@router.get(
+@planets_router.get(
     "/{planet_id}/vault",
     operation_id="read_vault",
     response_model=VaultOut,
@@ -64,7 +74,7 @@ def read_vault(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> Vaul
     return vault
 
 
-@router.get(
+@planets_router.get(
     "/{planet_id}/buildings",
     operation_id="list_buildings",
     response_model=list[BuildingOut],
@@ -78,7 +88,7 @@ def list_buildings(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> 
     return buildings
 
 
-@router.post(
+@planets_router.post(
     "/{planet_id}/buildings/{kind}/upgrade",
     operation_id="upgrade_building",
     response_model=BuildingUpgradeOut,
@@ -102,7 +112,7 @@ def upgrade_building(
     return result
 
 
-@router.get(
+@planets_router.get(
     "/{planet_id}/ships",
     operation_id="read_shipyard",
     response_model=ShipyardOut,
@@ -116,7 +126,7 @@ def read_shipyard(planet_id: UUID, user_id: UserIdDep, service: ServiceDep) -> S
     return shipyard
 
 
-@router.post(
+@planets_router.post(
     "/{planet_id}/ships/{kind}/order",
     operation_id="order_ships",
     response_model=ShipOrderResultOut,
@@ -142,3 +152,47 @@ def order_ships(
     if result is None:
         raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
     return result
+
+
+@planets_router.post(
+    "/{planet_id}/research/{kind}/start",
+    operation_id="start_research",
+    response_model=ResearchStartOut,
+    response_model_exclude_none=True,
+    responses={
+        401: {"model": ErrorOut},
+        404: {"model": ErrorOut},
+        409: {"model": ErrorOut},
+        422: {},
+    },
+)
+def start_research(
+    planet_id: UUID, kind: TechKind, user_id: UserIdDep, service: ServiceDep
+) -> ResearchStart:
+    try:
+        result = service.start_research(planet_id, user_id, kind)
+    except (
+        NoLabError,
+        ResearchRunningError,
+        TechnologyNotAvailableError,
+        InsufficientResourcesError,
+    ) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    if result is None:
+        raise HTTPException(status_code=404, detail=PLANET_NOT_FOUND)
+    return result
+
+
+@research_router.get(
+    "/research",
+    operation_id="read_research",
+    response_model=ResearchOut,
+    response_model_exclude_none=True,
+    responses={401: {"model": ErrorOut}},
+)
+def read_research(user_id: UserIdDep, service: ServiceDep) -> Research:
+    return service.read_research(user_id)
+
+
+router.include_router(planets_router)
+router.include_router(research_router)

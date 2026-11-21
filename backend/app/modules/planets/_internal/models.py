@@ -14,8 +14,9 @@ BuildingKind = Literal[
     "crystal_storage",
     "deuterium_tank",
     "shipyard",
+    "research_lab",
 ]
-# The order of the contract (docs/adr/0113).
+# The order of the contract (docs/adr/0117).
 BUILDING_ORDER: tuple[BuildingKind, ...] = (
     "metal_mine",
     "crystal_mine",
@@ -25,11 +26,16 @@ BUILDING_ORDER: tuple[BuildingKind, ...] = (
     "crystal_storage",
     "deuterium_tank",
     "shipyard",
+    "research_lab",
 )
 
 ShipKind = Literal["small_cargo", "light_fighter"]
 # The order of the contract (docs/adr/0115).
 SHIP_ORDER: tuple[ShipKind, ...] = ("small_cargo", "light_fighter")
+
+TechKind = Literal["energy_technology", "plasma_technology"]
+# The order of the contract (docs/adr/0117).
+TECH_ORDER: tuple[TechKind, ...] = ("energy_technology", "plasma_technology")
 
 
 @dataclass(frozen=True)
@@ -133,4 +139,40 @@ class Shipyard:
 @dataclass(frozen=True)
 class ShipOrderResult:
     shipyard: Shipyard
+    vault: Vault
+
+
+@dataclass(frozen=True)
+class StoredResearch:
+    """The one running research of a player, as stored (docs/adr/0117)."""
+
+    kind: TechKind
+    planet_id: UUID
+    finishes_at: datetime
+
+
+@dataclass(frozen=True)
+class Technology:
+    kind: TechKind
+    level: int
+    cost: Resources
+    available: bool
+
+
+@dataclass(frozen=True)
+class RunningResearch:
+    kind: TechKind
+    planet_id: UUID
+    finishes_at: datetime
+
+
+@dataclass(frozen=True)
+class Research:
+    technologies: list[Technology]
+    running: RunningResearch | None = None
+
+
+@dataclass(frozen=True)
+class ResearchStart:
+    research: Research
     vault: Vault
