@@ -146,11 +146,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the eight buildings of one planet of the logged-in user.
-         * @description Always eight buildings, in the order metal_mine, crystal_mine,
+         * List the nine buildings of one planet of the logged-in user.
+         * @description Always nine buildings, in the order metal_mine, crystal_mine,
          *     deuterium_synthesizer, solar_plant, metal_storage, crystal_storage,
-         *     deuterium_tank, shipyard. A building that was never upgraded has
-         *     level 0 (docs/adr/0112, docs/adr/0113, docs/adr/0115).
+         *     deuterium_tank, shipyard, research_lab. A building that was never
+         *     upgraded has level 0 (docs/adr/0112, 0113, 0115, 0117).
          */
         get: operations["list_buildings"];
         put?: never;
@@ -237,6 +237,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show the technologies and the running research of the logged-in user.
+         * @description The technologies belong to the player, so they count on each planet.
+         *     The server first completes a research that is due (docs/adr/0117).
+         */
+        get: operations["read_research"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/planets/{planet_id}/research/{kind}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+                kind: components["parameters"]["TechKind"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start the research of one technology by one level. It costs resources from the vault of the planet.
+         * @description The research lab of the planet does the research. The server first
+         *     completes the events that are due and adds the production up to now.
+         *     Then it subtracts the cost and starts the research, in one
+         *     transaction. The level goes up at finishes_at (docs/adr/0117). A
+         *     player has at most one running research.
+         */
+        post: operations["start_research"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -284,7 +332,7 @@ export interface components {
             deuterium: components["schemas"]["Amount"];
         };
         /** @enum {string} */
-        BuildingKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer" | "solar_plant" | "metal_storage" | "crystal_storage" | "deuterium_tank" | "shipyard";
+        BuildingKind: "metal_mine" | "crystal_mine" | "deuterium_synthesizer" | "solar_plant" | "metal_storage" | "crystal_storage" | "deuterium_tank" | "shipyard" | "research_lab";
         /**
          * @description Energy is not stored and does not count up. If used is more than
          *     produced, each mine produces only produced / used of its production
@@ -300,13 +348,13 @@ export interface components {
             /**
              * @description What this building adds per hour, at its level, after the energy
              *     factor and without the base income. 0 for the solar plant, the storage,
-             *     and the shipyard.
+             *     the shipyard, and the research lab.
              */
             production_per_hour: components["schemas"]["Amount"];
             /**
              * @description What this building produces and uses, at its level. A mine has
-             *     produced 0. The solar plant has used 0. The storage and the shipyard
-             *     have 0 and 0.
+             *     produced 0. The solar plant has used 0. The storage, the shipyard,
+             *     and the research lab have 0 and 0.
              */
             energy: components["schemas"]["Energy"];
             /** @description The cost of the next level. */
@@ -361,6 +409,42 @@ export interface components {
             shipyard: components["schemas"]["Shipyard"];
             vault: components["schemas"]["Vault"];
         };
+        /** @enum {string} */
+        TechKind: "energy_technology" | "plasma_technology";
+        Technology: {
+            kind: components["schemas"]["TechKind"];
+            level: number;
+            /** @description The cost of the next level. */
+            cost: components["schemas"]["Resources"];
+            /**
+             * @description False if a required technology level is missing. Plasma
+             *     technology needs energy technology level 1 (docs/adr/0117).
+             */
+            available: boolean;
+        };
+        RunningResearch: {
+            kind: components["schemas"]["TechKind"];
+            /**
+             * Format: uuid
+             * @description The planet that paid, and whose research lab does the research.
+             */
+            planet_id: string;
+            /**
+             * Format: date-time
+             * @description At this time, the level of the technology goes up by one.
+             */
+            finishes_at: string;
+        };
+        Research: {
+            /** @description Always two technologies, in the order energy_technology, plasma_technology. */
+            technologies: components["schemas"]["Technology"][];
+            /** @description Only if a research runs for the player. */
+            running?: components["schemas"]["RunningResearch"];
+        };
+        ResearchStart: {
+            research: components["schemas"]["Research"];
+            vault: components["schemas"]["Vault"];
+        };
         /**
          * @description An amount of one resource. The maximum is the largest integer that
          *     JavaScript can hold without a loss of precision.
@@ -389,6 +473,7 @@ export interface components {
         PlanetId: string;
         BuildingKind: components["schemas"]["BuildingKind"];
         ShipKind: components["schemas"]["ShipKind"];
+        TechKind: components["schemas"]["TechKind"];
     };
     requestBodies: never;
     headers: never;
@@ -692,7 +777,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The planet ID is not a UUID, or the kind is not one of the eight building kinds. */
+            /** @description The planet ID is not a UUID, or the kind is not one of the nine building kinds. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -785,6 +870,84 @@ export interface operations {
                 };
             };
             /** @description The planet ID is not a UUID, the kind is not a ship kind, or the count is not from 1 to 1000. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_research: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The research of the player. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Research"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    start_research: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planet_id: components["parameters"]["PlanetId"];
+                kind: components["parameters"]["TechKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The research with the new running research, and the vault of the planet after the cost. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchStart"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["PlanetNotFound"];
+            /** @description The research lab of the planet has level 0, a research runs for the player, a required technology level is missing, or the vault has too little for the cost. Nothing changes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The planet ID is not a UUID, or the kind is not a technology. */
             422: {
                 headers: {
                     [name: string]: unknown;

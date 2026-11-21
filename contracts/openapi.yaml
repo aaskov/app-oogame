@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.9.1
+  version: 0.10.0
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -161,12 +161,13 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: list_buildings
-      summary: List the eight buildings of one planet of the logged-in user.
+      x-planned: true
+      summary: List the nine buildings of one planet of the logged-in user.
       description: |
-        Always eight buildings, in the order metal_mine, crystal_mine,
+        Always nine buildings, in the order metal_mine, crystal_mine,
         deuterium_synthesizer, solar_plant, metal_storage, crystal_storage,
-        deuterium_tank, shipyard. A building that was never upgraded has
-        level 0 (docs/adr/0112, docs/adr/0113, docs/adr/0115).
+        deuterium_tank, shipyard, research_lab. A building that was never
+        upgraded has level 0 (docs/adr/0112, 0113, 0115, 0117).
       responses:
         "200":
           description: The buildings of the planet.
@@ -193,6 +194,7 @@ paths:
       - $ref: "#/components/parameters/BuildingKind"
     post:
       operationId: upgrade_building
+      x-planned: true
       summary: Start the upgrade of one building by one level. It costs resources from the vault.
       description: |
         The server first completes an upgrade that is due and adds the
@@ -223,7 +225,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "422":
-          description: The planet ID is not a UUID, or the kind is not one of the eight building kinds.
+          description: The planet ID is not a UUID, or the kind is not one of the nine building kinds.
 
   /planets/{planet_id}/ships:
     parameters:
@@ -293,6 +295,66 @@ paths:
         "422":
           description: The planet ID is not a UUID, the kind is not a ship kind, or the count is not from 1 to 1000.
 
+  /research:
+    get:
+      operationId: read_research
+      x-planned: true
+      summary: Show the technologies and the running research of the logged-in user.
+      description: |
+        The technologies belong to the player, so they count on each planet.
+        The server first completes a research that is due (docs/adr/0117).
+      responses:
+        "200":
+          description: The research of the player.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Research"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /planets/{planet_id}/research/{kind}/start:
+    parameters:
+      - $ref: "#/components/parameters/PlanetId"
+      - $ref: "#/components/parameters/TechKind"
+    post:
+      operationId: start_research
+      x-planned: true
+      summary: Start the research of one technology by one level. It costs resources from the vault of the planet.
+      description: |
+        The research lab of the planet does the research. The server first
+        completes the events that are due and adds the production up to now.
+        Then it subtracts the cost and starts the research, in one
+        transaction. The level goes up at finishes_at (docs/adr/0117). A
+        player has at most one running research.
+      responses:
+        "200":
+          description: The research with the new running research, and the vault of the planet after the cost.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchStart"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/PlanetNotFound"
+        "409":
+          description: The research lab of the planet has level 0, a research runs for the player, a required technology level is missing, or the vault has too little for the cost. Nothing changes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: The planet ID is not a UUID, or the kind is not a technology.
+
 components:
   parameters:
     PlanetId:
@@ -316,6 +378,13 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/ShipKind"
+
+    TechKind:
+      name: kind
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/TechKind"
 
   responses:
     PlanetNotFound:
@@ -412,7 +481,7 @@ components:
 
     BuildingKind:
       type: string
-      enum: [metal_mine, crystal_mine, deuterium_synthesizer, solar_plant, metal_storage, crystal_storage, deuterium_tank, shipyard]
+      enum: [metal_mine, crystal_mine, deuterium_synthesizer, solar_plant, metal_storage, crystal_storage, deuterium_tank, shipyard, research_lab]
 
     Energy:
       description: |
@@ -442,13 +511,13 @@ components:
           description: |
             What this building adds per hour, at its level, after the energy
             factor and without the base income. 0 for the solar plant, the storage,
-            and the shipyard.
+            the shipyard, and the research lab.
           $ref: "#/components/schemas/Amount"
         energy:
           description: |
             What this building produces and uses, at its level. A mine has
-            produced 0. The solar plant has used 0. The storage and the shipyard
-            have 0 and 0.
+            produced 0. The solar plant has used 0. The storage, the shipyard,
+            and the research lab have 0 and 0.
           $ref: "#/components/schemas/Energy"
         upgrade_cost:
           description: The cost of the next level.
@@ -538,6 +607,65 @@ components:
       properties:
         shipyard:
           $ref: "#/components/schemas/Shipyard"
+        vault:
+          $ref: "#/components/schemas/Vault"
+
+    TechKind:
+      type: string
+      enum: [energy_technology, plasma_technology]
+
+    Technology:
+      type: object
+      required: [kind, level, cost, available]
+      properties:
+        kind:
+          $ref: "#/components/schemas/TechKind"
+        level:
+          type: integer
+          minimum: 0
+        cost:
+          description: The cost of the next level.
+          $ref: "#/components/schemas/Resources"
+        available:
+          description: |
+            False if a required technology level is missing. Plasma
+            technology needs energy technology level 1 (docs/adr/0117).
+          type: boolean
+
+    RunningResearch:
+      type: object
+      required: [kind, planet_id, finishes_at]
+      properties:
+        kind:
+          $ref: "#/components/schemas/TechKind"
+        planet_id:
+          description: The planet that paid, and whose research lab does the research.
+          type: string
+          format: uuid
+        finishes_at:
+          description: At this time, the level of the technology goes up by one.
+          type: string
+          format: date-time
+
+    Research:
+      type: object
+      required: [technologies]
+      properties:
+        technologies:
+          description: Always two technologies, in the order energy_technology, plasma_technology.
+          type: array
+          items:
+            $ref: "#/components/schemas/Technology"
+        running:
+          description: Only if a research runs for the player.
+          $ref: "#/components/schemas/RunningResearch"
+
+    ResearchStart:
+      type: object
+      required: [research, vault]
+      properties:
+        research:
+          $ref: "#/components/schemas/Research"
         vault:
           $ref: "#/components/schemas/Vault"
 
