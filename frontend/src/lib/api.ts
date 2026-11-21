@@ -25,6 +25,11 @@ export type ShipOrder = components["schemas"]["ShipOrder"];
 export type Shipyard = components["schemas"]["Shipyard"];
 export type ShipOrderRequest = components["schemas"]["ShipOrderRequest"];
 export type ShipOrderResult = components["schemas"]["ShipOrderResult"];
+export type TechKind = components["schemas"]["TechKind"];
+export type Technology = components["schemas"]["Technology"];
+export type RunningResearch = components["schemas"]["RunningResearch"];
+export type Research = components["schemas"]["Research"];
+export type ResearchStart = components["schemas"]["ResearchStart"];
 export type Energy = components["schemas"]["Energy"];
 export type ApiError = components["schemas"]["Error"];
 
