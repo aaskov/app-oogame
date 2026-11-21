@@ -1,4 +1,14 @@
-import type { Building, BuildingUpgrade, Ship, ShipOrderResult, Shipyard, Vault } from "@/lib/api";
+import type {
+  Building,
+  BuildingUpgrade,
+  Research,
+  ResearchStart,
+  Ship,
+  ShipOrderResult,
+  Shipyard,
+  Technology,
+  Vault,
+} from "@/lib/api";
 
 type Reply = { status: number; body?: unknown };
 type Route = Reply | Reply[];
@@ -157,6 +167,52 @@ export const shipOrderResult: ShipOrderResult = {
     metal: 4000,
     crystal: 4000,
     deuterium: 0,
+    production_per_hour: { metal: 30, crystal: 15, deuterium: 0 },
+    energy: { produced: 22, used: 22 },
+    capacity: { metal: 10000, crystal: 10000, deuterium: 10000 },
+    calculated_at: "2026-10-19T00:00:00Z",
+  },
+};
+
+export const energyTechnology: Technology = {
+  kind: "energy_technology",
+  level: 0,
+  cost: { metal: 0, crystal: 800, deuterium: 400 },
+  available: true,
+};
+
+export const plasmaTechnology: Technology = {
+  kind: "plasma_technology",
+  level: 0,
+  cost: { metal: 2000, crystal: 4000, deuterium: 1000 },
+  available: false,
+};
+
+export const research: Research = { technologies: [energyTechnology, plasmaTechnology] };
+
+// Energy technology from level 0 to 1 at lab level 1 is due 1440 seconds
+// after the system time the tests set ("2026-10-19T00:00:00Z"), matching the
+// example research time of docs/adr/0117.
+export const researchRunning: Research = {
+  technologies: [energyTechnology, plasmaTechnology],
+  running: {
+    kind: "energy_technology",
+    planet_id: homeworld.id,
+    finishes_at: "2026-10-19T00:24:00Z",
+  },
+};
+
+export const researchAfterComplete: Research = {
+  technologies: [{ ...energyTechnology, level: 1 }, { ...plasmaTechnology, available: true }],
+};
+
+export const researchStartResult: ResearchStart = {
+  research: researchRunning,
+  vault: {
+    planet_id: homeworld.id,
+    metal: 500,
+    crystal: 400,
+    deuterium: 200,
     production_per_hour: { metal: 30, crystal: 15, deuterium: 0 },
     energy: { produced: 22, used: 22 },
     capacity: { metal: 10000, crystal: 10000, deuterium: 10000 },

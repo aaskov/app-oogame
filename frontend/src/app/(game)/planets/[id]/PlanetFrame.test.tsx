@@ -39,4 +39,11 @@ describe("PlanetFrame", () => {
 
     expect(screen.getByRole("link", { name: "Shipyard" }).getAttribute("aria-current")).toBe("page");
   });
+
+  it("marks Research as the open tab on the research route", async () => {
+    usePathname.mockReturnValue(`/planets/${homeworld.id}/research`);
+    renderLayout({ [`GET /planets/${homeworld.id}/vault`]: { status: 200, body: vault } });
+
+    expect(screen.getByRole("link", { name: "Research" }).getAttribute("aria-current")).toBe("page");
+  });
 });
