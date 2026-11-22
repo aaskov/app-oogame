@@ -587,7 +587,7 @@ class PlanetService:
             row = self._repository.lock_vault(pid, user_id)
             if row is not None:
                 vault_rows[pid] = row
-        self._complete_due_research_locked(user_id, vault_rows)
+        vault_rows = self._complete_due_research_locked(user_id, vault_rows)
 
         vault_row = vault_rows.get(planet_id)
         if vault_row is None:
@@ -661,7 +661,7 @@ class PlanetService:
 
     def _complete_due_research_locked(
         self, user_id: UUID, vault_rows: dict[UUID, StoredVault]
-    ) -> None:
+    ) -> dict[UUID, StoredVault]:
         """Complete a due research, with the vault locks of every planet of the
         player held. The caller commits.
 
@@ -669,11 +669,16 @@ class PlanetService:
         before the research's finish time. Then stores the amounts of each
         planet up to that time, with the old technology levels. Finally raises
         the technology level and deletes the research row.
+
+        Returns the vault rows as they are stored now, so a caller that keeps
+        completing events in the same transaction does not read the amounts
+        and the time from before this completion.
         """
         research = self._repository.get_research(user_id)
         if research is None or research.finishes_at > self._now:
-            return
+            return vault_rows
         old_tech_levels = self._repository.get_technology_levels(user_id)
+        updated_rows = dict(vault_rows)
         for planet_id, vault_row in vault_rows.items():
             levels = self._repository.get_building_levels(planet_id)
             construction = self._repository.get_construction(planet_id)
@@ -685,9 +690,17 @@ class PlanetService:
             self._repository.update_vault_amounts(
                 planet_id, vault.metal, vault.crystal, vault.deuterium, stored_at
             )
+            updated_rows[planet_id] = StoredVault(
+                planet_id=planet_id,
+                metal=vault.metal,
+                crystal=vault.crystal,
+                deuterium=vault.deuterium,
+                updated_at=stored_at,
+            )
         new_level = old_tech_levels.get(research.kind, 0) + 1
         self._repository.set_technology_level(user_id, research.kind, new_level)
         self._repository.delete_research(user_id)
+        return updated_rows
 
     def _research(
         self, tech_levels: dict[str, int], running: StoredResearch | None

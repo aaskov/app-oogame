@@ -7,7 +7,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.shared.orm.research import TechnologyRow
+from app.shared.orm.constructions import ConstructionRow
+from app.shared.orm.research import ResearchRow, TechnologyRow
 from app.shared.orm.users import UserRow
 from app.shared.orm.vaults import VaultRow
 from tests.test_planets import (
@@ -420,3 +421,125 @@ def test_a_research_that_finishes_changes_production_after_its_finish_time(
     assert after["metal"] == at_finish + (30 + 72) * 1
     assert client.get("/research").json()["technologies"][0]["level"] == 1
     assert "running" not in client.get("/research").json()
+
+
+def test_start_research_uses_the_production_stored_by_a_due_research_not_the_old_one(
+    session: Session,
+) -> None:
+    """A regression test for issue #79.
+
+    Plasma technology finishes at T. A second research starts at T + 10 hours,
+    with no read of the vault or the research in between. The vault must add
+    the old (pre-plasma) production up to T, then the new (post-plasma)
+    production from T to T + 10 hours, before it subtracts the cost. Before
+    the fix, `start_research` used the vault rows from before
+    `_complete_due_research_locked` ran, so the whole period used the new
+    production.
+    """
+    app, client = new_client(session)
+    planet_id = home_planet(client)
+    user_id = user_id_of(session, "ada@example.com")
+    set_building_level(session, planet_id, "research_lab", 1)
+    set_building_level(session, planet_id, "solar_plant", 2)
+    set_building_level(session, planet_id, "metal_mine", 2)
+    set_building_level(session, planet_id, "metal_storage", 10)
+    set_building_level(session, planet_id, "crystal_storage", 10)
+    set_building_level(session, planet_id, "deuterium_tank", 10)
+    set_technology_level(session, user_id, "energy_technology", 1)
+    set_vault(session, planet_id, metal=10000, crystal=10000, deuterium=10000, updated_at=BASE_TIME)
+    set_clock(app, BASE_TIME)
+
+    start_plasma = client.post(f"/planets/{planet_id}/research/plasma_technology/start")
+    assert start_plasma.status_code == 200
+    finishes_at = datetime.fromisoformat(start_plasma.json()["research"]["running"]["finishes_at"])
+    # 3600 * (2000 + 4000) / 1000 / (1 + 1) = 10800 seconds = 3 hours.
+    assert finishes_at == BASE_TIME + timedelta(hours=3)
+
+    # No read of the vault or the research happens between the finish and the
+    # next start.
+    set_clock(app, finishes_at + timedelta(hours=10))
+    response = client.post(f"/planets/{planet_id}/research/energy_technology/start")
+
+    assert response.status_code == 200
+    body = response.json()
+    # Metal mine 2: floor(30 * 2 * 1.1^2) = floor(72.6) = 72 at plasma 0, 73 at plasma 1.
+    # 10000 - 2000 (the plasma cost), then 3 hours at the old production (30 + 72),
+    # then 10 hours at the new one (30 + 73).
+    metal_at_finish = 10000 - 2000 + (30 + 72) * 3
+    metal_after = metal_at_finish + (30 + 73) * 10
+    # Crystal has no mine, so its production does not depend on the technology:
+    # 10000 - 4000 (the plasma cost) + 15 * 13 hours - 1600 (the energy cost, level 1).
+    crystal_after = 10000 - 4000 + 15 * 13 - 1600
+    # Deuterium: 10000 - 1000 (the plasma cost) - 800 (the energy cost, level 1).
+    deuterium_after = 10000 - 1000 - 800
+    assert body["vault"]["metal"] == metal_after
+    assert body["vault"]["crystal"] == crystal_after
+    assert body["vault"]["deuterium"] == deuterium_after
+    assert body["research"]["technologies"][1]["kind"] == "plasma_technology"
+    assert body["research"]["technologies"][1]["level"] == 1
+    assert body["research"]["running"]["kind"] == "energy_technology"
+
+
+def _due_building_and_research(
+    session: Session, client: TestClient, email: str
+) -> tuple[UUID, UUID]:
+    """A planet with a research due at BASE_TIME + 1h and a building upgrade due
+    an hour later, both before the clock that `start_research` reads."""
+    planet_id = home_planet(client, email)
+    user_id = user_id_of(session, email)
+    set_building_level(session, planet_id, "research_lab", 1)
+    set_building_level(session, planet_id, "solar_plant", 2)
+    set_building_level(session, planet_id, "metal_mine", 2)
+    set_vault(session, planet_id, metal=10000, crystal=10000, deuterium=10000, updated_at=BASE_TIME)
+    session.add(
+        ResearchRow(
+            user_id=user_id,
+            kind="energy_technology",
+            planet_id=planet_id,
+            finishes_at=BASE_TIME + timedelta(hours=1),
+        )
+    )
+    session.add(
+        ConstructionRow(
+            planet_id=planet_id, kind="metal_mine", finishes_at=BASE_TIME + timedelta(hours=2)
+        )
+    )
+    session.commit()
+    return planet_id, user_id
+
+
+def test_start_research_with_a_due_building_and_a_due_research_matches_a_read_before_the_start(
+    session: Session,
+) -> None:
+    direct_app, direct_client = new_client(session)
+    direct_planet_id, _ = _due_building_and_research(session, direct_client, "ada@example.com")
+    set_clock(direct_app, BASE_TIME + timedelta(hours=5))
+
+    direct = direct_client.post(f"/planets/{direct_planet_id}/research/energy_technology/start")
+
+    with_read_app, with_read_client = new_client(session)
+    with_read_planet_id, _ = _due_building_and_research(
+        session, with_read_client, "bob@example.com"
+    )
+    set_clock(with_read_app, BASE_TIME + timedelta(hours=5))
+    with_read_client.get(f"/planets/{with_read_planet_id}/vault")
+
+    with_read = with_read_client.post(
+        f"/planets/{with_read_planet_id}/research/energy_technology/start"
+    )
+
+    assert direct.status_code == 200
+    assert with_read.status_code == 200
+    direct_vault = direct.json()["vault"]
+    with_read_vault = with_read.json()["vault"]
+    assert (direct_vault["metal"], direct_vault["crystal"], direct_vault["deuterium"]) == (
+        with_read_vault["metal"],
+        with_read_vault["crystal"],
+        with_read_vault["deuterium"],
+    )
+    assert direct_vault["production_per_hour"] == with_read_vault["production_per_hour"]
+    direct_research = direct.json()["research"]
+    with_read_research = with_read.json()["research"]
+    assert direct_research["technologies"] == with_read_research["technologies"]
+    assert direct_research["running"]["kind"] == with_read_research["running"]["kind"]
+    assert direct_research["running"]["finishes_at"] == with_read_research["running"]["finishes_at"]
