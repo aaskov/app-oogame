@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.10.0
+  version: 0.10.1
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -161,7 +161,6 @@ paths:
       - $ref: "#/components/parameters/PlanetId"
     get:
       operationId: list_buildings
-      x-planned: true
       summary: List the nine buildings of one planet of the logged-in user.
       description: |
         Always nine buildings, in the order metal_mine, crystal_mine,
@@ -194,7 +193,6 @@ paths:
       - $ref: "#/components/parameters/BuildingKind"
     post:
       operationId: upgrade_building
-      x-planned: true
       summary: Start the upgrade of one building by one level. It costs resources from the vault.
       description: |
         The server first completes an upgrade that is due and adds the
@@ -298,7 +296,6 @@ paths:
   /research:
     get:
       operationId: read_research
-      x-planned: true
       summary: Show the technologies and the running research of the logged-in user.
       description: |
         The technologies belong to the player, so they count on each planet.
@@ -323,7 +320,6 @@ paths:
       - $ref: "#/components/parameters/TechKind"
     post:
       operationId: start_research
-      x-planned: true
       summary: Start the research of one technology by one level. It costs resources from the vault of the planet.
       description: |
         The research lab of the planet does the research. The server first

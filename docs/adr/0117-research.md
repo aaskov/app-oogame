@@ -76,7 +76,8 @@ belongs to the player, so it counts on each planet.
 
 - `list_buildings` and `upgrade_building` are `x-planned` in the prep,
   because `BuildingKind` gets `research_lab`. `read_research` and
-  `start_research` are new and `x-planned`. The cleanup removes the flags.
+  `start_research` are new and `x-planned`. The cleanup removes the flags
+  (done after #76 and #77).
 - `read_vault` keeps its schema, but its values now depend on the
   technologies. The backend issue covers this.
 - The prep adds the label of the lab to the frontend, so that the type check
