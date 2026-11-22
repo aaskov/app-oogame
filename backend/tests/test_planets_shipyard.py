@@ -91,12 +91,12 @@ def has_null(node: object) -> bool:
 # --- The shipyard as a building ---------------------------------------------------
 
 
-def test_list_buildings_has_the_shipyard_last_with_its_cost_at_each_level(
+def test_list_buildings_has_the_shipyard_second_to_last_with_its_cost_at_each_level(
     session: Session,
 ) -> None:
     _app, client, planet_id = start(session, shipyard_level=0)
 
-    level_0 = client.get(f"/planets/{planet_id}/buildings").json()[-1]
+    level_0 = client.get(f"/planets/{planet_id}/buildings").json()[-2]
     assert level_0["kind"] == "shipyard"
     assert level_0["level"] == 0
     assert level_0["production_per_hour"] == 0
@@ -104,7 +104,7 @@ def test_list_buildings_has_the_shipyard_last_with_its_cost_at_each_level(
     assert level_0["upgrade_cost"] == {"metal": 400, "crystal": 200, "deuterium": 100}
 
     set_building_level(session, planet_id, "shipyard", 3)
-    level_3 = client.get(f"/planets/{planet_id}/buildings").json()[-1]
+    level_3 = client.get(f"/planets/{planet_id}/buildings").json()[-2]
     assert level_3["upgrade_cost"] == {"metal": 3200, "crystal": 1600, "deuterium": 800}
 
 
@@ -126,8 +126,8 @@ def test_shipyard_upgrade_follows_the_build_time_rules(session: Session) -> None
 
     set_clock(app, BASE_TIME + timedelta(seconds=864))
     buildings = client.get(f"/planets/{planet_id}/buildings").json()
-    assert buildings[-1]["kind"] == "shipyard"
-    assert buildings[-1]["level"] == 1
+    assert buildings[-2]["kind"] == "shipyard"
+    assert buildings[-2]["level"] == 1
     assert "upgrade_finishes_at" not in buildings[-1]
 
 

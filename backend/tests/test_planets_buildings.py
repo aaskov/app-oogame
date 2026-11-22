@@ -28,6 +28,7 @@ BUILDING_ORDER = [
     "crystal_storage",
     "deuterium_tank",
     "shipyard",
+    "research_lab",
 ]
 
 
@@ -173,7 +174,7 @@ def test_list_buildings_returns_the_four_buildings_in_order_at_level_0(
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 8
+    assert len(body) == 9
     assert [building["kind"] for building in body] == BUILDING_ORDER
     assert all(building["level"] == 0 for building in body)
     assert all(building["production_per_hour"] == 0 for building in body)
@@ -187,6 +188,7 @@ def test_list_buildings_returns_the_four_buildings_in_order_at_level_0(
         {"metal": 1000, "crystal": 500, "deuterium": 0},
         {"metal": 1000, "crystal": 1000, "deuterium": 0},
         {"metal": 400, "crystal": 200, "deuterium": 100},
+        {"metal": 200, "crystal": 400, "deuterium": 200},
     ]
 
 
@@ -208,6 +210,7 @@ def test_list_buildings_returns_the_energy_and_the_cost_at_a_level(
         crystal_storage,
         deuterium_tank,
         shipyard,
+        research_lab,
     ) = body
     assert metal_mine["energy"] == {"produced": 0, "used": 39}
     assert crystal_mine["energy"] == {"produced": 0, "used": 39}
@@ -231,6 +234,9 @@ def test_list_buildings_returns_the_energy_and_the_cost_at_a_level(
     assert shipyard["production_per_hour"] == 0
     assert shipyard["energy"] == {"produced": 0, "used": 0}
     assert shipyard["upgrade_cost"] == {"metal": 3200, "crystal": 1600, "deuterium": 800}
+    assert research_lab["production_per_hour"] == 0
+    assert research_lab["energy"] == {"produced": 0, "used": 0}
+    assert research_lab["upgrade_cost"] == {"metal": 1600, "crystal": 3200, "deuterium": 1600}
 
 
 # --- POST /planets/{planet_id}/buildings/{kind}/upgrade ---------------------------------

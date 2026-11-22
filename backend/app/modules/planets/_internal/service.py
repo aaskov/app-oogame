@@ -7,20 +7,27 @@ from app.modules.planets._internal.models import (
     BUILDING_ORDER,
     MAX_AMOUNT,
     SHIP_ORDER,
+    TECH_ORDER,
     Building,
     BuildingKind,
     BuildingUpgrade,
     Construction,
     Energy,
     Planet,
+    Research,
+    ResearchStart,
     Resources,
+    RunningResearch,
     Ship,
     ShipKind,
     ShipOrder,
     ShipOrderResult,
     Shipyard,
+    StoredResearch,
     StoredShipOrder,
     StoredVault,
+    TechKind,
+    Technology,
     Vault,
 )
 from app.modules.planets._internal.repository import PlanetRepository
@@ -33,7 +40,7 @@ _MINE_COEFFICIENT: dict[str, int] = {
     "deuterium_synthesizer": 10,
 }
 
-# Energy at level L is coefficient · L · 1.1^L, rounded down (docs/adr/0112).
+# Energy at level L is coefficient · L · 1.1^L, rounded down (docs/adr/0112, 0117).
 _ENERGY_PRODUCED_COEFFICIENT: dict[str, int] = {"solar_plant": 20}
 _ENERGY_USED_COEFFICIENT: dict[str, int] = {
     "metal_mine": 10,
@@ -41,10 +48,19 @@ _ENERGY_USED_COEFFICIENT: dict[str, int] = {
     "deuterium_synthesizer": 20,
 }
 
+# The plasma technology bonus on mine production, 0.01 · P for metal, 0.0066 · P
+# for crystal, 0.0033 · P for deuterium. It does not apply to the base income
+# (docs/adr/0117).
+_PLASMA_BONUS_COEFFICIENT: dict[str, float] = {
+    "metal_mine": 0.01,
+    "crystal_mine": 0.0066,
+    "deuterium_synthesizer": 0.0033,
+}
+
 # The base income of each planet per hour, before GAME_SPEED (docs/adr/0111).
 _BASE_INCOME = Resources(metal=30, crystal=15, deuterium=0)
 
-# (metal base, crystal base, ratio) for the cost of the next level (docs/adr/0111, 0112, 0113).
+# (metal base, crystal base, ratio) for the next level's cost (docs/adr/0111 to 0113, 0117).
 _UPGRADE_COST: dict[BuildingKind, tuple[float, float, float]] = {
     "metal_mine": (60, 15, 1.5),
     "crystal_mine": (48, 24, 1.6),
@@ -54,14 +70,28 @@ _UPGRADE_COST: dict[BuildingKind, tuple[float, float, float]] = {
     "crystal_storage": (1000, 500, 2.0),
     "deuterium_tank": (1000, 1000, 2.0),
     "shipyard": (400, 200, 2.0),
+    "research_lab": (200, 400, 2.0),
 }
-# The deuterium base of the next level's cost. Only the shipyard has one (docs/adr/0115).
-_UPGRADE_DEUTERIUM: dict[BuildingKind, float] = {"shipyard": 100}
+# The deuterium base of the next level's cost. Only the shipyard and the
+# research lab have one (docs/adr/0115, 0117).
+_UPGRADE_DEUTERIUM: dict[BuildingKind, float] = {"shipyard": 100, "research_lab": 200}
 
 # The cost of one ship (docs/adr/0115).
 _SHIP_COST: dict[ShipKind, Resources] = {
     "small_cargo": Resources(metal=2000, crystal=2000, deuterium=0),
     "light_fighter": Resources(metal=3000, crystal=1000, deuterium=0),
+}
+
+# The cost of the next technology level, before the 2^L growth (docs/adr/0117).
+_TECH_COST_BASE: dict[TechKind, Resources] = {
+    "energy_technology": Resources(metal=0, crystal=800, deuterium=400),
+    "plasma_technology": Resources(metal=2000, crystal=4000, deuterium=1000),
+}
+_TECH_RATIO = 2.0
+
+# The technology level a technology needs before it is available (docs/adr/0117).
+_TECH_REQUIREMENTS: dict[TechKind, tuple[TechKind, int]] = {
+    "plasma_technology": ("energy_technology", 1),
 }
 
 
@@ -81,20 +111,37 @@ class ShipOrderRunningError(Exception):
     """A ship order already runs on the planet (docs/adr/0115)."""
 
 
+class NoLabError(Exception):
+    """The research lab of the planet has level 0 (docs/adr/0117)."""
+
+
+class ResearchRunningError(Exception):
+    """A research already runs for the player (docs/adr/0117)."""
+
+
+class TechnologyNotAvailableError(Exception):
+    """A required technology level is missing (docs/adr/0117)."""
+
+
 def _clamp(amount: int) -> int:
     return min(amount, MAX_AMOUNT)
 
 
-def _building_energy(kind: str, level: int) -> Energy:
+def _building_energy(kind: str, level: int, energy_tech_level: int) -> Energy:
     growth = level * 1.1**level
+    produced_coefficient = _ENERGY_PRODUCED_COEFFICIENT.get(kind, 0)
+    if kind == "solar_plant":
+        produced = math.floor(produced_coefficient * growth * (1 + 0.1 * energy_tech_level))
+    else:
+        produced = math.floor(produced_coefficient * growth)
     return Energy(
-        produced=math.floor(_ENERGY_PRODUCED_COEFFICIENT.get(kind, 0) * growth),
+        produced=produced,
         used=math.floor(_ENERGY_USED_COEFFICIENT.get(kind, 0) * growth),
     )
 
 
-def _planet_energy(levels: dict[str, int]) -> Energy:
-    energies = [_building_energy(kind, level) for kind, level in levels.items()]
+def _planet_energy(levels: dict[str, int], energy_tech_level: int) -> Energy:
+    energies = [_building_energy(kind, level, energy_tech_level) for kind, level in levels.items()]
     return Energy(
         produced=sum(energy.produced for energy in energies),
         used=sum(energy.used for energy in energies),
@@ -107,10 +154,13 @@ def _energy_factor(energy: Energy) -> float:
     return min(1.0, energy.produced / energy.used)
 
 
-def _mine_production_per_hour(kind: str, level: int, factor: float, game_speed: float) -> int:
+def _mine_production_per_hour(
+    kind: str, level: int, factor: float, game_speed: float, plasma_tech_level: int
+) -> int:
     """The production of one building. 0 for a building that is not a mine."""
     raw = _MINE_COEFFICIENT.get(kind, 0) * level * 1.1**level
-    return _clamp(math.floor(raw * factor * game_speed))
+    bonus = _PLASMA_BONUS_COEFFICIENT.get(kind, 0.0) * plasma_tech_level
+    return _clamp(math.floor(raw * factor * (1 + bonus) * game_speed))
 
 
 def _upgrade_cost(kind: BuildingKind, level: int) -> Resources:
@@ -135,11 +185,36 @@ def _ship_build_seconds(cost: Resources, shipyard_level: int, game_speed: float)
     )
 
 
+def _research_time_seconds(cost: Resources, lab_level: int, game_speed: float) -> int:
+    """Seconds, rounded down, at least 1 (docs/adr/0117)."""
+    return max(
+        1, math.floor(3600 * (cost.metal + cost.crystal) / 1000 / (1 + lab_level) / game_speed)
+    )
+
+
+def _tech_cost(kind: TechKind, level: int) -> Resources:
+    base = _TECH_COST_BASE[kind]
+    return Resources(
+        metal=_clamp(math.floor(base.metal * _TECH_RATIO**level)),
+        crystal=_clamp(math.floor(base.crystal * _TECH_RATIO**level)),
+        deuterium=_clamp(math.floor(base.deuterium * _TECH_RATIO**level)),
+    )
+
+
+def _technology_available(kind: TechKind, tech_levels: dict[str, int]) -> bool:
+    requirement = _TECH_REQUIREMENTS.get(kind)
+    if requirement is None:
+        return True
+    required_kind, required_level = requirement
+    return tech_levels.get(required_kind, 0) >= required_level
+
+
 def _vault_production_per_hour(
-    levels: dict[str, int], factor: float, game_speed: float
+    levels: dict[str, int], factor: float, game_speed: float, plasma_tech_level: int
 ) -> Resources:
     def per_hour(base: int, kind: str) -> int:
-        mine = _mine_production_per_hour(kind, levels.get(kind, 0), factor, game_speed)
+        level = levels.get(kind, 0)
+        mine = _mine_production_per_hour(kind, level, factor, game_speed, plasma_tech_level)
         return _clamp(math.floor(base * game_speed) + mine)
 
     return Resources(
@@ -185,20 +260,24 @@ class PlanetService:
         return self._repository.list_for_user(user_id)
 
     def read_vault(self, planet_id: UUID, user_id: UUID) -> Vault | None:
+        self._complete_due_research(user_id)
         self._complete_due(planet_id, user_id)
         row = self._repository.get_vault(planet_id, user_id)
         if row is None:
             return None
         levels = self._repository.get_building_levels(planet_id)
-        return self._vault_from_row(row, levels, self._now)
+        tech_levels = self._repository.get_technology_levels(user_id)
+        return self._vault_from_row(row, levels, tech_levels, self._now)
 
     def list_buildings(self, planet_id: UUID, user_id: UUID) -> list[Building] | None:
         if not self._repository.planet_owned_by(planet_id, user_id):
             return None
+        self._complete_due_research(user_id)
         self._complete_due(planet_id, user_id)
         levels = self._repository.get_building_levels(planet_id)
         construction = self._repository.get_construction(planet_id)
-        return [self._building(kind, levels, construction) for kind in BUILDING_ORDER]
+        tech_levels = self._repository.get_technology_levels(user_id)
+        return [self._building(kind, levels, construction, tech_levels) for kind in BUILDING_ORDER]
 
     def upgrade_building(
         self, planet_id: UUID, user_id: UUID, kind: BuildingKind
@@ -209,17 +288,19 @@ class PlanetService:
         InsufficientResourcesError if the vault has too little. Both roll back.
         Returns the building with the old level and the vault after the cost.
         """
+        self._complete_due_research(user_id)
         vault_row = self._repository.lock_vault(planet_id, user_id)
         if vault_row is None:
             return None
-        vault_row, running = self._complete_due_locked(planet_id, vault_row)
+        tech_levels = self._repository.get_technology_levels(user_id)
+        vault_row, running = self._complete_due_locked(planet_id, vault_row, tech_levels)
         if running is not None:
             self._repository.rollback()
             raise UpgradeRunningError("An upgrade is already running on the planet")
 
         levels = self._repository.get_building_levels(planet_id)
         level = levels.get(kind, 0)
-        vault = self._vault_from_row(vault_row, levels, self._now)
+        vault = self._vault_from_row(vault_row, levels, tech_levels, self._now)
         cost = _upgrade_cost(kind, level)
         insufficient = (
             vault.metal < cost.metal
@@ -244,7 +325,9 @@ class PlanetService:
 
         construction = Construction(kind=kind, finishes_at=finishes_at)
         new_vault = replace(vault, metal=metal, crystal=crystal, deuterium=deuterium)
-        return BuildingUpgrade(building=self._building(kind, levels, construction), vault=new_vault)
+        return BuildingUpgrade(
+            building=self._building(kind, levels, construction, tech_levels), vault=new_vault
+        )
 
     def read_shipyard(self, planet_id: UUID, user_id: UUID) -> Shipyard | None:
         if not self._repository.planet_owned_by(planet_id, user_id):
@@ -262,11 +345,13 @@ class PlanetService:
         Each of them rolls back. Returns the shipyard with the new order and the
         vault after the cost.
         """
+        self._complete_due_research(user_id)
         vault_row = self._repository.lock_vault(planet_id, user_id)
         if vault_row is None:
             return None
+        tech_levels = self._repository.get_technology_levels(user_id)
         # A due shipyard upgrade changes the level and the stored vault.
-        vault_row, _ = self._complete_due_locked(planet_id, vault_row)
+        vault_row, _ = self._complete_due_locked(planet_id, vault_row, tech_levels)
         running = self._complete_due_ships_locked(planet_id)
 
         levels = self._repository.get_building_levels(planet_id)
@@ -278,7 +363,7 @@ class PlanetService:
             self._repository.rollback()
             raise ShipOrderRunningError("A ship order is already running on the planet")
 
-        vault = self._vault_from_row(vault_row, levels, self._now)
+        vault = self._vault_from_row(vault_row, levels, tech_levels, self._now)
         unit = _SHIP_COST[kind]
         cost = Resources(
             metal=unit.metal * count,
@@ -387,11 +472,12 @@ class PlanetService:
         vault_row = self._repository.lock_vault(planet_id, user_id)
         if vault_row is None:
             return
-        self._complete_due_locked(planet_id, vault_row)
+        tech_levels = self._repository.get_technology_levels(user_id)
+        self._complete_due_locked(planet_id, vault_row, tech_levels)
         self._repository.commit()
 
     def _complete_due_locked(
-        self, planet_id: UUID, vault_row: StoredVault
+        self, planet_id: UUID, vault_row: StoredVault, tech_levels: dict[str, int]
     ) -> tuple[StoredVault, Construction | None]:
         """Complete a due upgrade, with the vault lock held. The caller commits.
 
@@ -405,7 +491,7 @@ class PlanetService:
         levels = self._repository.get_building_levels(planet_id)
         # Never store a time before the stored time (docs/adr/0111).
         stored_at = max(construction.finishes_at, vault_row.updated_at)
-        vault = self._vault_from_row(vault_row, levels, stored_at)
+        vault = self._vault_from_row(vault_row, levels, tech_levels, stored_at)
         self._repository.update_vault_amounts(
             planet_id, vault.metal, vault.crystal, vault.deuterium, stored_at
         )
@@ -423,17 +509,23 @@ class PlanetService:
         return stored, None
 
     def _building(
-        self, kind: BuildingKind, levels: dict[str, int], construction: Construction | None
+        self,
+        kind: BuildingKind,
+        levels: dict[str, int],
+        construction: Construction | None,
+        tech_levels: dict[str, int],
     ) -> Building:
         level = levels.get(kind, 0)
-        factor = _energy_factor(_planet_energy(levels))
+        energy_tech_level = tech_levels.get("energy_technology", 0)
+        plasma_tech_level = tech_levels.get("plasma_technology", 0)
+        factor = _energy_factor(_planet_energy(levels, energy_tech_level))
         return Building(
             kind=kind,
             level=level,
             production_per_hour=_mine_production_per_hour(
-                kind, level, factor, self._settings.game_speed
+                kind, level, factor, self._settings.game_speed, plasma_tech_level
             ),
-            energy=_building_energy(kind, level),
+            energy=_building_energy(kind, level, energy_tech_level),
             upgrade_cost=_upgrade_cost(kind, level),
             upgrade_finishes_at=(
                 construction.finishes_at
@@ -442,10 +534,14 @@ class PlanetService:
             ),
         )
 
-    def _vault_from_row(self, row: StoredVault, levels: dict[str, int], at: datetime) -> Vault:
-        energy = _planet_energy(levels)
+    def _vault_from_row(
+        self, row: StoredVault, levels: dict[str, int], tech_levels: dict[str, int], at: datetime
+    ) -> Vault:
+        energy_tech_level = tech_levels.get("energy_technology", 0)
+        plasma_tech_level = tech_levels.get("plasma_technology", 0)
+        energy = _planet_energy(levels, energy_tech_level)
         production = _vault_production_per_hour(
-            levels, _energy_factor(energy), self._settings.game_speed
+            levels, _energy_factor(energy), self._settings.game_speed, plasma_tech_level
         )
         capacity = _vault_capacity(levels)
         # A request can read its time, then wait for an upgrade that stores a
@@ -463,3 +559,153 @@ class PlanetService:
             capacity=capacity,
             calculated_at=at,
         )
+
+    def read_research(self, user_id: UUID) -> Research:
+        self._complete_due_research(user_id)
+        tech_levels = self._repository.get_technology_levels(user_id)
+        running = self._repository.get_research(user_id)
+        return self._research(tech_levels, running)
+
+    def start_research(
+        self, planet_id: UUID, user_id: UUID, kind: TechKind
+    ) -> ResearchStart | None:
+        """Start a research: the six steps of docs/adr/0117, in one transaction.
+
+        Raises NoLabError, ResearchRunningError, TechnologyNotAvailableError, or
+        InsufficientResourcesError. Each of them rolls back. Returns the research
+        with the new running research, and the vault of the planet after the cost.
+        """
+        if not self._repository.planet_owned_by(planet_id, user_id):
+            return None
+
+        # Lock the vaults of every planet of the player, in the order of the
+        # planet ID, so a research that completes changes every planet's
+        # production consistently, and two starts of the player cannot race.
+        planet_ids = self._repository.list_planet_ids_for_user(user_id)
+        vault_rows: dict[UUID, StoredVault] = {}
+        for pid in planet_ids:
+            row = self._repository.lock_vault(pid, user_id)
+            if row is not None:
+                vault_rows[pid] = row
+        self._complete_due_research_locked(user_id, vault_rows)
+
+        vault_row = vault_rows.get(planet_id)
+        if vault_row is None:
+            self._repository.rollback()
+            return None
+
+        tech_levels = self._repository.get_technology_levels(user_id)
+        vault_row, _ = self._complete_due_locked(planet_id, vault_row, tech_levels)
+        vault_rows[planet_id] = vault_row
+
+        levels = self._repository.get_building_levels(planet_id)
+        lab_level = levels.get("research_lab", 0)
+        if lab_level == 0:
+            self._repository.rollback()
+            raise NoLabError("The research lab of the planet has level 0")
+
+        running = self._repository.get_research(user_id)
+        if running is not None:
+            self._repository.rollback()
+            raise ResearchRunningError("A research is already running")
+
+        if not _technology_available(kind, tech_levels):
+            self._repository.rollback()
+            raise TechnologyNotAvailableError("A required technology level is missing")
+
+        vault = self._vault_from_row(vault_row, levels, tech_levels, self._now)
+        cost = _tech_cost(kind, tech_levels.get(kind, 0))
+        if (
+            vault.metal < cost.metal
+            or vault.crystal < cost.crystal
+            or vault.deuterium < cost.deuterium
+        ):
+            self._repository.rollback()
+            raise InsufficientResourcesError("Not enough resources for the research")
+
+        finishes_at = self._now + timedelta(
+            seconds=_research_time_seconds(cost, lab_level, self._settings.game_speed)
+        )
+        metal = vault.metal - cost.metal
+        crystal = vault.crystal - cost.crystal
+        deuterium = vault.deuterium - cost.deuterium
+        # Never store a time before the stored time (docs/adr/0111).
+        stored_at = max(self._now, vault_row.updated_at)
+        self._repository.update_vault_amounts(planet_id, metal, crystal, deuterium, stored_at)
+        self._repository.add_research(user_id, kind, planet_id, finishes_at)
+        self._repository.commit()
+
+        new_vault = replace(vault, metal=metal, crystal=crystal, deuterium=deuterium)
+        running = StoredResearch(kind=kind, planet_id=planet_id, finishes_at=finishes_at)
+        research = self._research(tech_levels, running)
+        return ResearchStart(research=research, vault=new_vault)
+
+    def _complete_due_research(self, user_id: UUID) -> None:
+        """Complete a research that is due, before a read (docs/adr/0117).
+
+        Takes the vault locks of every planet of the player only if a research
+        is due. Another request can complete it while this one waits, so the
+        research row is read again after the locks.
+        """
+        research = self._repository.get_research(user_id)
+        if research is None or research.finishes_at > self._now:
+            return
+        planet_ids = self._repository.list_planet_ids_for_user(user_id)
+        vault_rows: dict[UUID, StoredVault] = {}
+        for planet_id in planet_ids:
+            row = self._repository.lock_vault(planet_id, user_id)
+            if row is not None:
+                vault_rows[planet_id] = row
+        self._complete_due_research_locked(user_id, vault_rows)
+        self._repository.commit()
+
+    def _complete_due_research_locked(
+        self, user_id: UUID, vault_rows: dict[UUID, StoredVault]
+    ) -> None:
+        """Complete a due research, with the vault locks of every planet of the
+        player held. The caller commits.
+
+        On each planet, first completes a building upgrade that is due at or
+        before the research's finish time. Then stores the amounts of each
+        planet up to that time, with the old technology levels. Finally raises
+        the technology level and deletes the research row.
+        """
+        research = self._repository.get_research(user_id)
+        if research is None or research.finishes_at > self._now:
+            return
+        old_tech_levels = self._repository.get_technology_levels(user_id)
+        for planet_id, vault_row in vault_rows.items():
+            levels = self._repository.get_building_levels(planet_id)
+            construction = self._repository.get_construction(planet_id)
+            if construction is not None and construction.finishes_at <= research.finishes_at:
+                vault_row, _ = self._complete_due_locked(planet_id, vault_row, old_tech_levels)
+                levels = self._repository.get_building_levels(planet_id)
+            stored_at = max(research.finishes_at, vault_row.updated_at)
+            vault = self._vault_from_row(vault_row, levels, old_tech_levels, stored_at)
+            self._repository.update_vault_amounts(
+                planet_id, vault.metal, vault.crystal, vault.deuterium, stored_at
+            )
+        new_level = old_tech_levels.get(research.kind, 0) + 1
+        self._repository.set_technology_level(user_id, research.kind, new_level)
+        self._repository.delete_research(user_id)
+
+    def _research(
+        self, tech_levels: dict[str, int], running: StoredResearch | None
+    ) -> Research:
+        technologies = [
+            Technology(
+                kind=kind,
+                level=tech_levels.get(kind, 0),
+                cost=_tech_cost(kind, tech_levels.get(kind, 0)),
+                available=_technology_available(kind, tech_levels),
+            )
+            for kind in TECH_ORDER
+        ]
+        running_model = (
+            RunningResearch(
+                kind=running.kind, planet_id=running.planet_id, finishes_at=running.finishes_at
+            )
+            if running is not None
+            else None
+        )
+        return Research(technologies=technologies, running=running_model)

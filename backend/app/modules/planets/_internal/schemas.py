@@ -17,8 +17,10 @@ BuildingKind = Literal[
     "crystal_storage",
     "deuterium_tank",
     "shipyard",
+    "research_lab",
 ]
 ShipKind = Literal["small_cargo", "light_fighter"]
+TechKind = Literal["energy_technology", "plasma_technology"]
 
 
 class PlanetOut(BaseModel):
@@ -109,6 +111,38 @@ class ShipOrderResultOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     shipyard: ShipyardOut
+    vault: VaultOut
+
+
+class TechnologyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: TechKind
+    level: int = Field(ge=0)
+    cost: ResourcesOut
+    available: bool
+
+
+class RunningResearchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: TechKind
+    planet_id: UUID
+    finishes_at: datetime
+
+
+class ResearchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    technologies: list[TechnologyOut]
+    # Absent, not null, without a running research (docs/adr/0110, docs/adr/0117).
+    running: RunningResearchOut | SkipJsonSchema[None] = None
+
+
+class ResearchStartOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    research: ResearchOut
     vault: VaultOut
 
 
