@@ -20,10 +20,19 @@ describe("SectionTabs", () => {
     expect(screen.getByRole("link", { name: "Buildings" }).getAttribute("aria-current")).toBeNull();
   });
 
+  it("marks Research as the open tab on the research page", () => {
+    render(<SectionTabs planetId="p1" active="research" />);
+
+    expect(screen.getByRole("link", { name: "Research" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Buildings" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getByRole("link", { name: "Shipyard" }).getAttribute("aria-current")).toBeNull();
+  });
+
   it("links each tab to the planet's route", () => {
     render(<SectionTabs planetId="p1" active="buildings" />);
 
     expect(screen.getByRole("link", { name: "Buildings" }).getAttribute("href")).toBe("/planets/p1/buildings");
     expect(screen.getByRole("link", { name: "Shipyard" }).getAttribute("href")).toBe("/planets/p1/shipyard");
+    expect(screen.getByRole("link", { name: "Research" }).getAttribute("href")).toBe("/planets/p1/research");
   });
 });

@@ -18,7 +18,11 @@ export function PlanetFrame({
   const { id } = useParams<{ id: string }>();
   const pathname = usePathname();
   const vaultState = useVault(id, client);
-  const active = pathname.endsWith("/shipyard") ? "shipyard" : "buildings";
+  const active = pathname.endsWith("/research")
+    ? "research"
+    : pathname.endsWith("/shipyard")
+      ? "shipyard"
+      : "buildings";
 
   return (
     <VaultContext.Provider value={vaultState}>
