@@ -122,11 +122,13 @@ sed -i 's/upgrade_finishes_at: datetime | SkipJsonSchema\[None\] = None/upgrade_
   "$b/app/modules/planets/_internal/schemas.py"
 expect 1 "check:contracts fails on null in a planned operation" slot contracts
 
-fresh; sed -i 's/min_length=8, max_length=128/max_length=128/' "$b/app/modules/auth/_internal/schemas.py"
+# These two cases use the ship operations. An operation that is x-planned
+# skips the schema compare, so a case must use an operation that is built.
+fresh; sed -i 's/count: int = Field(ge=1, le=1000)/count: int = Field(ge=1)/' "$b/app/modules/planets/_internal/schemas.py"
 expect 1 "check:contracts fails when the backend lacks a contract constraint" slot contracts
 
-fresh; sed -i 's/^    responses={401: {"model": ErrorOut}},$/    responses={401: {"model": ErrorOut}, 403: {"model": ErrorOut}},/' \
-  "$b/app/modules/auth/_internal/router.py"
+fresh; sed -i 's/^    responses={401: {"model": ErrorOut}, 404: {"model": ErrorOut}, 422: {}},$/    responses={401: {"model": ErrorOut}, 403: {"model": ErrorOut}, 404: {"model": ErrorOut}, 422: {}},/' \
+  "$b/app/modules/planets/_internal/router.py"
 expect 1 "check:contracts fails when the backend has a response code that is not in the contract" slot contracts
 
 # --- the dependencies layer (docs/adr/0104) ------------------------------------

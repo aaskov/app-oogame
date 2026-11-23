@@ -30,6 +30,12 @@ export type Technology = components["schemas"]["Technology"];
 export type RunningResearch = components["schemas"]["RunningResearch"];
 export type Research = components["schemas"]["Research"];
 export type ResearchStart = components["schemas"]["ResearchStart"];
+export type Registration = components["schemas"]["Registration"];
+export type Username = components["schemas"]["Username"];
+export type Coordinates = components["schemas"]["Coordinates"];
+export type GalaxySystem = components["schemas"]["GalaxySystem"];
+export type GalaxyPosition = components["schemas"]["GalaxyPosition"];
+export type GalaxyPlanet = components["schemas"]["GalaxyPlanet"];
 export type Energy = components["schemas"]["Energy"];
 export type ApiError = components["schemas"]["Error"];
 

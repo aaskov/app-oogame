@@ -7,7 +7,7 @@ migration in backend/migrations/.
 from app.shared.orm.base import Base
 from app.shared.orm.buildings import BUILDING_KINDS, MINE_KINDS, STORAGE_KINDS, BuildingRow
 from app.shared.orm.constructions import ConstructionRow
-from app.shared.orm.planets import HOME_PLANET_NAME, PlanetRow
+from app.shared.orm.planets import HOME_PLANET_NAME, POSITIONS_PER_SYSTEM, PlanetRow
 from app.shared.orm.research import TECH_KINDS, ResearchRow, TechnologyRow
 from app.shared.orm.ships import SHIP_KINDS, ShipOrderRow, ShipRow
 from app.shared.orm.users import UserRow
@@ -17,6 +17,7 @@ __all__ = [
     "BUILDING_KINDS",
     "HOME_PLANET_NAME",
     "MINE_KINDS",
+    "POSITIONS_PER_SYSTEM",
     "SHIP_KINDS",
     "START_CRYSTAL",
     "START_DEUTERIUM",

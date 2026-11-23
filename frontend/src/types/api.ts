@@ -100,7 +100,9 @@ export interface paths {
          * List the planets of the logged-in user.
          * @description If the user has no planets, the call first creates the home planet
          *     "Homeworld" with its vault: metal 500, crystal 500, deuterium 0
-         *     (docs/adr/0109). The list is sorted by creation time, oldest first.
+         *     (docs/adr/0109). The home planet gets a random free position from 4
+         *     to 12 (docs/adr/0118). The list is sorted by creation time, oldest
+         *     first.
          */
         get: operations["list_planets"];
         put?: never;
@@ -285,6 +287,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/galaxy/{galaxy}/{system}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                galaxy: number;
+                system: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * Show the 15 positions of one solar system. A logged-in user can see each system.
+         * @description Only public data: the planet name and the username of the owner.
+         *     Never an email, an amount, or a level (docs/adr/0118).
+         */
+        get: operations["read_galaxy_system"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -298,16 +324,54 @@ export interface components {
             email: string;
             password: string;
         };
+        Registration: {
+            /** Format: email */
+            email: string;
+            password: string;
+            /**
+             * @description The public name of the player (docs/adr/0118). Unique. Optional
+             *     only until the frontend sends it. The cleanup makes it required.
+             */
+            username?: components["schemas"]["Username"];
+        };
+        Username: string;
         User: {
             /** Format: uuid */
             id: string;
             /** Format: email */
             email: string;
+            username: components["schemas"]["Username"];
         };
         Planet: {
             /** Format: uuid */
             id: string;
             name: string;
+            coordinates: components["schemas"]["Coordinates"];
+        };
+        /** @description Shown as [galaxy:system:position], for example [1:23:7] (docs/adr/0118). */
+        Coordinates: {
+            galaxy: number;
+            system: number;
+            position: number;
+        };
+        GalaxySystem: {
+            galaxy: number;
+            system: number;
+            /** @description The number of galaxies in the universe. */
+            galaxies: number;
+            /** @description The number of systems in each galaxy. */
+            systems_per_galaxy: number;
+            /** @description Always 15 positions, in the order 1 to 15. */
+            positions: components["schemas"]["GalaxyPosition"][];
+        };
+        GalaxyPosition: {
+            position: number;
+            /** @description Only if a planet is at this position. */
+            planet?: components["schemas"]["GalaxyPlanet"];
+        };
+        GalaxyPlanet: {
+            name: string;
+            username: components["schemas"]["Username"];
         };
         Vault: {
             /** Format: uuid */
@@ -510,7 +574,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Credentials"];
+                "application/json": components["schemas"]["Registration"];
             };
         };
         responses: {
@@ -523,7 +587,7 @@ export interface operations {
                     "application/json": components["schemas"]["User"];
                 };
             };
-            /** @description A user with this email exists. */
+            /** @description A user with this email or this username exists. The detail tells which. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -532,7 +596,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The email or the password is not valid. */
+            /** @description The email, the password, or the username is not valid. */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -948,6 +1012,54 @@ export interface operations {
                 };
             };
             /** @description The planet ID is not a UUID, or the kind is not a technology. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_galaxy_system: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                galaxy: number;
+                system: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The solar system. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalaxySystem"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The galaxy or the system is larger than the universe. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The galaxy or the system is not an integer of 1 or more. */
             422: {
                 headers: {
                     [name: string]: unknown;

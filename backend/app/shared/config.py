@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Multiplies each production (docs/adr/0111). Set GAME_SPEED=100 in development
     # to see production at once.
     game_speed: float = Field(default=1.0, gt=0)
+    # The size of the universe (docs/adr/0118). Each system has 15 positions.
+    galaxies: int = Field(default=1, ge=1)
+    systems_per_galaxy: int = Field(default=50, ge=1)
 
 
 @lru_cache

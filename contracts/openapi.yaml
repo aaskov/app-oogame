@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: app-oogame
-  version: 0.10.1
+  version: 0.11.0
   description: |
     The contract between the backend and the frontend. Architect-owned.
     x-planned: true marks an operation that is not built yet. check:contracts
@@ -23,13 +23,14 @@ paths:
   /auth/register:
     post:
       operationId: register
+      x-planned: true
       summary: Create a user. It does not log the user in.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Credentials"
+              $ref: "#/components/schemas/Registration"
       responses:
         "201":
           description: The user was created.
@@ -38,17 +39,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/User"
         "409":
-          description: A user with this email exists.
+          description: A user with this email or this username exists. The detail tells which.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "422":
-          description: The email or the password is not valid.
+          description: The email, the password, or the username is not valid.
 
   /auth/login:
     post:
       operationId: login
+      x-planned: true
       summary: Log in. The response sets the httpOnly session cookie.
       requestBody:
         required: true
@@ -88,6 +90,7 @@ paths:
   /auth/me:
     get:
       operationId: read_me
+      x-planned: true
       summary: Return the user of the session cookie.
       responses:
         "200":
@@ -106,11 +109,14 @@ paths:
   /planets:
     get:
       operationId: list_planets
+      x-planned: true
       summary: List the planets of the logged-in user.
       description: |
         If the user has no planets, the call first creates the home planet
         "Homeworld" with its vault: metal 500, crystal 500, deuterium 0
-        (docs/adr/0109). The list is sorted by creation time, oldest first.
+        (docs/adr/0109). The home planet gets a random free position from 4
+        to 12 (docs/adr/0118). The list is sorted by creation time, oldest
+        first.
       responses:
         "200":
           description: The planets of the logged-in user.
@@ -351,6 +357,49 @@ paths:
         "422":
           description: The planet ID is not a UUID, or the kind is not a technology.
 
+  /galaxy/{galaxy}/{system}:
+    parameters:
+      - name: galaxy
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      - name: system
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+    get:
+      operationId: read_galaxy_system
+      x-planned: true
+      summary: Show the 15 positions of one solar system. A logged-in user can see each system.
+      description: |
+        Only public data: the planet name and the username of the owner.
+        Never an email, an amount, or a level (docs/adr/0118).
+      responses:
+        "200":
+          description: The solar system.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GalaxySystem"
+        "401":
+          description: No valid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: The galaxy or the system is larger than the universe.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: The galaxy or the system is not an integer of 1 or more.
+
 components:
   parameters:
     PlanetId:
@@ -415,9 +464,33 @@ components:
           minLength: 8
           maxLength: 128
 
+    Registration:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        username:
+          description: |
+            The public name of the player (docs/adr/0118). Unique. Optional
+            only until the frontend sends it. The cleanup makes it required.
+          $ref: "#/components/schemas/Username"
+
+    Username:
+      type: string
+      minLength: 3
+      maxLength: 20
+      pattern: "^[A-Za-z0-9_-]+$"
+
     User:
       type: object
-      required: [id, email]
+      required: [id, email, username]
       properties:
         id:
           type: string
@@ -425,10 +498,12 @@ components:
         email:
           type: string
           format: email
+        username:
+          $ref: "#/components/schemas/Username"
 
     Planet:
       type: object
-      required: [id, name]
+      required: [id, name, coordinates]
       properties:
         id:
           type: string
@@ -436,6 +511,70 @@ components:
         name:
           type: string
           maxLength: 40
+        coordinates:
+          $ref: "#/components/schemas/Coordinates"
+
+    Coordinates:
+      description: Shown as [galaxy:system:position], for example [1:23:7] (docs/adr/0118).
+      type: object
+      required: [galaxy, system, position]
+      properties:
+        galaxy:
+          type: integer
+          minimum: 1
+        system:
+          type: integer
+          minimum: 1
+        position:
+          type: integer
+          minimum: 1
+          maximum: 15
+
+    GalaxySystem:
+      type: object
+      required: [galaxy, system, galaxies, systems_per_galaxy, positions]
+      properties:
+        galaxy:
+          type: integer
+          minimum: 1
+        system:
+          type: integer
+          minimum: 1
+        galaxies:
+          description: The number of galaxies in the universe.
+          type: integer
+          minimum: 1
+        systems_per_galaxy:
+          description: The number of systems in each galaxy.
+          type: integer
+          minimum: 1
+        positions:
+          description: Always 15 positions, in the order 1 to 15.
+          type: array
+          items:
+            $ref: "#/components/schemas/GalaxyPosition"
+
+    GalaxyPosition:
+      type: object
+      required: [position]
+      properties:
+        position:
+          type: integer
+          minimum: 1
+          maximum: 15
+        planet:
+          description: Only if a planet is at this position.
+          $ref: "#/components/schemas/GalaxyPlanet"
+
+    GalaxyPlanet:
+      type: object
+      required: [name, username]
+      properties:
+        name:
+          type: string
+          maxLength: 40
+        username:
+          $ref: "#/components/schemas/Username"
 
     Vault:
       type: object
