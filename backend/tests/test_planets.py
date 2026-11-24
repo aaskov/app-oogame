@@ -19,7 +19,11 @@ NOT_FOUND = "Planet not found"
 
 
 def register_and_login(client: TestClient, email: str) -> None:
-    client.post("/auth/register", json={"email": email, "password": "correct horse"})
+    username = email.split("@", 1)[0]
+    client.post(
+        "/auth/register",
+        json={"email": email, "password": "correct horse", "username": username},
+    )
     client.post("/auth/login", json={"email": email, "password": "correct horse"})
 
 
@@ -108,7 +112,11 @@ def test_list_planets_returns_planets_oldest_first(client: TestClient, session: 
     register_and_login(client, "ada@example.com")
     client.get("/planets")
     home = session.scalars(planets_of("ada@example.com")).one()
-    other = PlanetRow(user_id=home.user_id, name="Colony", is_home=False)
+    # position 1 to 3 and 13 to 15 are never used by a home planet, so this
+    # cannot collide with the home planet's random coordinates.
+    other = PlanetRow(
+        user_id=home.user_id, name="Colony", is_home=False, galaxy=1, system=1, position=1
+    )
     session.add(other)
     session.commit()
 

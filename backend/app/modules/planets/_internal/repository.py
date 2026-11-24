@@ -3,10 +3,12 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.planets._internal.models import (
     Construction,
+    Coordinates,
     Planet,
     ShipKind,
     StoredResearch,
@@ -19,11 +21,20 @@ from app.shared.orm.constructions import ConstructionRow
 from app.shared.orm.planets import HOME_PLANET_NAME, PlanetRow
 from app.shared.orm.research import ResearchRow, TechnologyRow
 from app.shared.orm.ships import ShipOrderRow, ShipRow
+from app.shared.orm.users import UserRow
 from app.shared.orm.vaults import START_CRYSTAL, START_DEUTERIUM, START_METAL, VaultRow
 
 
 def _to_planet(row: PlanetRow) -> Planet:
-    return Planet(id=row.id, name=row.name)
+    # Nullable only until the backend sets them for each new row (docs/adr/0118).
+    assert row.galaxy is not None
+    assert row.system is not None
+    assert row.position is not None
+    return Planet(
+        id=row.id,
+        name=row.name,
+        coordinates=Coordinates(galaxy=row.galaxy, system=row.system, position=row.position),
+    )
 
 
 def _to_stored_vault(row: VaultRow) -> StoredVault:
@@ -56,20 +67,61 @@ class PlanetRepository:
         )
         return [_to_planet(row) for row in rows]
 
-    def create_home_planet(self, user_id: UUID) -> None:
-        """Create "Homeworld" and its vault, unless the user already has one.
+    def home_planet_exists(self, user_id: UUID) -> bool:
+        return (
+            self._session.scalars(
+                select(PlanetRow.id).where(PlanetRow.user_id == user_id, PlanetRow.is_home)
+            ).one_or_none()
+            is not None
+        )
 
-        Uses INSERT ... ON CONFLICT DO NOTHING on the partial unique index, so
-        two first requests at the same time cannot create two home planets
-        (docs/adr/0109).
+    def occupied_positions(self, position_min: int, position_max: int) -> set[tuple[int, int, int]]:
+        """The (galaxy, system, position) triples already taken in the given
+        position range, so the service can offer only free ones (docs/adr/0118)."""
+        rows = self._session.execute(
+            select(PlanetRow.galaxy, PlanetRow.system, PlanetRow.position).where(
+                PlanetRow.position.between(position_min, position_max)
+            )
+        )
+        result: set[tuple[int, int, int]] = set()
+        for galaxy, system, position in rows:
+            assert galaxy is not None
+            assert system is not None
+            assert position is not None
+            result.add((galaxy, system, position))
+        return result
+
+    def try_create_home_planet(
+        self, user_id: UUID, galaxy: int, system: int, position: int
+    ) -> UUID | None:
+        """Try to insert "Homeworld" and its vault at the given coordinates.
+
+        Returns the new planet ID, or None if the user already has a home
+        planet (the partial unique index of docs/adr/0109 absorbs that race
+        silently) or the coordinates are already taken
+        (uq_planets_coordinates, docs/adr/0118). The caller tells the two
+        apart with home_planet_exists, and tries another position in the
+        second case. The caller commits or rolls back.
         """
         statement = (
             insert(PlanetRow)
-            .values(id=uuid4(), user_id=user_id, name=HOME_PLANET_NAME, is_home=True)
+            .values(
+                id=uuid4(),
+                user_id=user_id,
+                name=HOME_PLANET_NAME,
+                is_home=True,
+                galaxy=galaxy,
+                system=system,
+                position=position,
+            )
             .on_conflict_do_nothing(index_elements=["user_id"], index_where=text("is_home"))
             .returning(PlanetRow.id)
         )
-        created_id = self._session.scalars(statement).one_or_none()
+        try:
+            with self._session.begin_nested():
+                created_id = self._session.scalars(statement).one_or_none()
+        except IntegrityError:
+            return None
         if created_id is not None:
             self._session.add(
                 VaultRow(
@@ -79,7 +131,23 @@ class PlanetRepository:
                     deuterium=START_DEUTERIUM,
                 )
             )
-        self._session.commit()
+        return created_id
+
+    def planets_in_system(self, galaxy: int, system: int) -> dict[int, tuple[str, str]]:
+        """{position: (planet name, owner username)} for the occupied positions
+        of one system. A join on UserRow, so the galaxy view needs no change
+        to auth/public_api.py (docs/adr/0118)."""
+        rows = self._session.execute(
+            select(PlanetRow.position, PlanetRow.name, UserRow.username)
+            .join(UserRow, UserRow.id == PlanetRow.user_id)
+            .where(PlanetRow.galaxy == galaxy, PlanetRow.system == system)
+        )
+        result: dict[int, tuple[str, str]] = {}
+        for position, name, username in rows:
+            assert position is not None
+            assert username is not None
+            result[position] = (name, username)
+        return result
 
     def get_vault(self, planet_id: UUID, user_id: UUID) -> StoredVault | None:
         row = self._session.scalars(

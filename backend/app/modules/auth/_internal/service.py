@@ -4,7 +4,7 @@ from uuid import UUID
 import jwt
 from pwdlib import PasswordHash
 
-from app.modules.auth._internal.models import EmailTakenError, User
+from app.modules.auth._internal.models import EmailTakenError, User, UsernameTakenError
 from app.modules.auth._internal.repository import UserRepository
 from app.shared.config import Settings
 
@@ -23,11 +23,13 @@ class AuthService:
         self._repository = repository
         self._settings = settings
 
-    def register(self, email: str, password: str) -> User:
+    def register(self, email: str, password: str, username: str) -> User:
         email = normalize_email(email)
         if self._repository.get_by_email(email):
             raise EmailTakenError
-        return self._repository.add(email, _password_hash.hash(password))
+        if self._repository.get_by_username(username):
+            raise UsernameTakenError
+        return self._repository.add(email, username, _password_hash.hash(password))
 
     def authenticate(self, email: str, password: str) -> User | None:
         user = self._repository.get_by_email(normalize_email(email))

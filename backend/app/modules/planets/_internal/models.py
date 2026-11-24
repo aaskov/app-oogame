@@ -37,11 +37,24 @@ TechKind = Literal["energy_technology", "plasma_technology"]
 # The order of the contract (docs/adr/0117).
 TECH_ORDER: tuple[TechKind, ...] = ("energy_technology", "plasma_technology")
 
+# Each system has this many positions (docs/adr/0118, also app/shared/orm/planets.py).
+POSITIONS_PER_SYSTEM = 15
+# A home planet goes to a random free position in this range.
+HOME_POSITIONS: tuple[int, ...] = tuple(range(4, 13))
+
+
+@dataclass(frozen=True)
+class Coordinates:
+    galaxy: int
+    system: int
+    position: int
+
 
 @dataclass(frozen=True)
 class Planet:
     id: UUID
     name: str
+    coordinates: Coordinates
 
 
 @dataclass(frozen=True)
@@ -176,3 +189,24 @@ class Research:
 class ResearchStart:
     research: Research
     vault: Vault
+
+
+@dataclass(frozen=True)
+class GalaxyPlanet:
+    name: str
+    username: str
+
+
+@dataclass(frozen=True)
+class GalaxyPosition:
+    position: int
+    planet: GalaxyPlanet | None = None
+
+
+@dataclass(frozen=True)
+class GalaxySystem:
+    galaxy: int
+    system: int
+    galaxies: int
+    systems_per_galaxy: int
+    positions: list[GalaxyPosition]

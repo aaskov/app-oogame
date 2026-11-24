@@ -1,11 +1,14 @@
 import math
+import random
 from dataclasses import replace
 from datetime import datetime, timedelta
 from uuid import UUID
 
 from app.modules.planets._internal.models import (
     BUILDING_ORDER,
+    HOME_POSITIONS,
     MAX_AMOUNT,
+    POSITIONS_PER_SYSTEM,
     SHIP_ORDER,
     TECH_ORDER,
     Building,
@@ -13,6 +16,9 @@ from app.modules.planets._internal.models import (
     BuildingUpgrade,
     Construction,
     Energy,
+    GalaxyPlanet,
+    GalaxyPosition,
+    GalaxySystem,
     Planet,
     Research,
     ResearchStart,
@@ -121,6 +127,10 @@ class ResearchRunningError(Exception):
 
 class TechnologyNotAvailableError(Exception):
     """A required technology level is missing (docs/adr/0117)."""
+
+
+class NoFreePositionError(Exception):
+    """No position from 4 to 12 is free anywhere in the universe (docs/adr/0118)."""
 
 
 def _clamp(amount: int) -> int:
@@ -256,8 +266,61 @@ class PlanetService:
         planets = self._repository.list_for_user(user_id)
         if planets:
             return planets
-        self._repository.create_home_planet(user_id)
+        self._create_home_planet(user_id)
         return self._repository.list_for_user(user_id)
+
+    def _create_home_planet(self, user_id: UUID) -> None:
+        """Create the home planet at a random free position from 4 to 12, in a
+        random system of a random galaxy, inside the settings (docs/adr/0118).
+
+        Tries another free position if the insert hits uq_planets_coordinates.
+        Raises NoFreePositionError if no position from 4 to 12 is free.
+        """
+        occupied = self._repository.occupied_positions(
+            min(HOME_POSITIONS), max(HOME_POSITIONS)
+        )
+        candidates = [
+            (galaxy, system, position)
+            for galaxy in range(1, self._settings.galaxies + 1)
+            for system in range(1, self._settings.systems_per_galaxy + 1)
+            for position in HOME_POSITIONS
+            if (galaxy, system, position) not in occupied
+        ]
+        random.shuffle(candidates)
+        for galaxy, system, position in candidates:
+            created_id = self._repository.try_create_home_planet(user_id, galaxy, system, position)
+            if created_id is not None:
+                self._repository.commit()
+                return
+            if self._repository.home_planet_exists(user_id):
+                self._repository.rollback()
+                return
+        self._repository.rollback()
+        raise NoFreePositionError("No free position from 4 to 12 in the universe")
+
+    def read_galaxy_system(self, galaxy: int, system: int) -> GalaxySystem | None:
+        """The 15 positions of one system, or None if the galaxy or the system
+        is larger than the universe (docs/adr/0118)."""
+        if galaxy > self._settings.galaxies or system > self._settings.systems_per_galaxy:
+            return None
+        occupants = self._repository.planets_in_system(galaxy, system)
+        positions = [
+            GalaxyPosition(position=position, planet=self._galaxy_planet(occupants, position))
+            for position in range(1, POSITIONS_PER_SYSTEM + 1)
+        ]
+        return GalaxySystem(
+            galaxy=galaxy,
+            system=system,
+            galaxies=self._settings.galaxies,
+            systems_per_galaxy=self._settings.systems_per_galaxy,
+            positions=positions,
+        )
+
+    def _galaxy_planet(
+        self, occupants: dict[int, tuple[str, str]], position: int
+    ) -> GalaxyPlanet | None:
+        occupant = occupants.get(position)
+        return GalaxyPlanet(name=occupant[0], username=occupant[1]) if occupant else None
 
     def read_vault(self, planet_id: UUID, user_id: UUID) -> Vault | None:
         self._complete_due_research(user_id)

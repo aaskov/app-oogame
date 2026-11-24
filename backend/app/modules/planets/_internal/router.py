@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 
 from app.modules.auth.public_api import get_current_user_id
 from app.modules.planets._internal.dependencies import get_planet_service
@@ -9,6 +9,7 @@ from app.modules.planets._internal.models import (
     Building,
     BuildingKind,
     BuildingUpgrade,
+    GalaxySystem,
     Planet,
     Research,
     ResearchStart,
@@ -22,6 +23,7 @@ from app.modules.planets._internal.schemas import (
     BuildingOut,
     BuildingUpgradeOut,
     ErrorOut,
+    GalaxySystemOut,
     PlanetOut,
     ResearchOut,
     ResearchStartOut,
@@ -32,6 +34,7 @@ from app.modules.planets._internal.schemas import (
 )
 from app.modules.planets._internal.service import (
     InsufficientResourcesError,
+    NoFreePositionError,
     NoLabError,
     NoShipyardError,
     PlanetService,
@@ -44,6 +47,7 @@ from app.modules.planets._internal.service import (
 router = APIRouter()
 planets_router = APIRouter(prefix="/planets", tags=["planets"])
 research_router = APIRouter(tags=["research"])
+galaxy_router = APIRouter(tags=["galaxy"])
 
 ServiceDep = Annotated[PlanetService, Depends(get_planet_service)]
 UserIdDep = Annotated[UUID, Depends(get_current_user_id)]
@@ -55,10 +59,13 @@ PLANET_NOT_FOUND = "Planet not found"
     "",
     operation_id="list_planets",
     response_model=list[PlanetOut],
-    responses={401: {"model": ErrorOut}},
+    responses={401: {"model": ErrorOut}, 503: {"model": ErrorOut}},
 )
 def list_planets(user_id: UserIdDep, service: ServiceDep) -> list[Planet]:
-    return service.list_planets(user_id)
+    try:
+        return service.list_planets(user_id)
+    except NoFreePositionError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @planets_router.get(
@@ -194,5 +201,25 @@ def read_research(user_id: UserIdDep, service: ServiceDep) -> Research:
     return service.read_research(user_id)
 
 
+@galaxy_router.get(
+    "/galaxy/{galaxy}/{system}",
+    operation_id="read_galaxy_system",
+    response_model=GalaxySystemOut,
+    response_model_exclude_none=True,
+    responses={401: {"model": ErrorOut}, 404: {"model": ErrorOut}, 422: {}},
+)
+def read_galaxy_system(
+    galaxy: Annotated[int, Path(ge=1)],
+    system: Annotated[int, Path(ge=1)],
+    user_id: UserIdDep,
+    service: ServiceDep,
+) -> GalaxySystem:
+    result = service.read_galaxy_system(galaxy, system)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Galaxy or system not found")
+    return result
+
+
 router.include_router(planets_router)
 router.include_router(research_router)
+router.include_router(galaxy_router)
