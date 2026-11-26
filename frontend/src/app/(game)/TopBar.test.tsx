@@ -43,6 +43,28 @@ describe("TopBar", () => {
     expect(link.getAttribute("href")).toBe("/homeworld");
   });
 
+  it("shows the selected planet's coordinates", async () => {
+    useParams.mockReturnValue({ id: colony.id });
+    renderTopBar();
+
+    await screen.findByRole("link", { name: "Colony" });
+    expect(screen.getByText("[1:23:9]")).toBeTruthy();
+  });
+
+  it("does not show coordinates when no planet is selected", async () => {
+    renderTopBar();
+
+    await screen.findByRole("link", { name: "OOGame" });
+    expect(screen.queryByText("[1:23:7]")).toBeNull();
+  });
+
+  it("has a Galaxy link to the home planet's system", async () => {
+    renderTopBar();
+
+    const link = await screen.findByRole("link", { name: "Galaxy" });
+    expect(link.getAttribute("href")).toBe("/galaxy/1/23");
+  });
+
   it("logs out on click", async () => {
     const seen: Request[] = [];
     renderTopBar(seen);

@@ -2,17 +2,17 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
-import { api as defaultApi, type Credentials, type User } from "@/lib/api";
+import { api as defaultApi, type Credentials, type Registration, type User } from "@/lib/api";
 
 type Api = typeof defaultApi;
 
-export type AuthResult = { ok: true } | { ok: false; status: number };
+export type AuthResult = { ok: true } | { ok: false; status: number; detail?: string };
 
 export type Auth = {
   user: User | null;
   loading: boolean;
   login: (credentials: Credentials) => Promise<AuthResult>;
-  register: (credentials: Credentials) => Promise<AuthResult>;
+  register: (registration: Registration) => Promise<AuthResult>;
   logout: () => Promise<void>;
 };
 
@@ -56,16 +56,16 @@ export function useAuthState(client: Api = defaultApi): Auth {
   );
 
   const register = useCallback(
-    async (credentials: Credentials): Promise<AuthResult> => {
+    async (registration: Registration): Promise<AuthResult> => {
       try {
-        const { response } = await client.POST("/auth/register", { body: credentials });
+        const { error, response } = await client.POST("/auth/register", { body: registration });
         if (!response.ok) {
-          return { ok: false, status: response.status };
+          return { ok: false, status: response.status, detail: error?.detail };
         }
       } catch {
         return { ok: false, status: 0 };
       }
-      return login(credentials);
+      return login({ email: registration.email, password: registration.password });
     },
     [client, login],
   );

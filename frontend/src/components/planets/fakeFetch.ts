@@ -13,8 +13,16 @@ import type {
 type Reply = { status: number; body?: unknown };
 type Route = Reply | Reply[];
 
-export const homeworld = { id: "b2b7b8d0-6e1a-4c9e-9b8a-9a9e3d9a1a01", name: "Homeworld" };
-export const colony = { id: "d1a9b7a0-6e1a-4c9e-9b8a-9a9e3d9a1a02", name: "Colony" };
+export const homeworld = {
+  id: "b2b7b8d0-6e1a-4c9e-9b8a-9a9e3d9a1a01",
+  name: "Homeworld",
+  coordinates: { galaxy: 1, system: 23, position: 7 },
+};
+export const colony = {
+  id: "d1a9b7a0-6e1a-4c9e-9b8a-9a9e3d9a1a02",
+  name: "Colony",
+  coordinates: { galaxy: 1, system: 23, position: 9 },
+};
 
 export const vault: Vault = {
   planet_id: homeworld.id,
