@@ -12,11 +12,16 @@ from app.shared.orm.users import UserRow
 
 EMAIL = "ada@example.com"
 PASSWORD = "correct horse"
+USERNAME = "ada"
 UNKNOWN_OR_WRONG = "Invalid email or password"
 
 
-def register(client: TestClient, email: str = EMAIL, password: str = PASSWORD):
-    return client.post("/auth/register", json={"email": email, "password": password})
+def register(
+    client: TestClient, email: str = EMAIL, password: str = PASSWORD, username: str = USERNAME
+):
+    return client.post(
+        "/auth/register", json={"email": email, "password": password, "username": username}
+    )
 
 
 def login(client: TestClient, email: str = EMAIL, password: str = PASSWORD):
@@ -46,9 +51,10 @@ def test_register_returns_201_and_the_user(client: TestClient) -> None:
 
     assert response.status_code == 201
     body = response.json()
-    assert set(body) == {"id", "email"}
+    assert set(body) == {"id", "email", "username"}
     assert UUID(body["id"])
     assert body["email"] == EMAIL
+    assert body["username"] == USERNAME
 
 
 def test_register_stores_an_argon2_hash_never_the_password(
@@ -99,6 +105,53 @@ def test_register_does_not_log_the_user_in(client: TestClient) -> None:
     response = register(client)
 
     assert "set-cookie" not in response.headers
+
+
+# --- register: username -------------------------------------------------
+
+
+@pytest.mark.parametrize("username", ["ab", "x" * 21, "has space", "has.dot", "", "emoji🙂"])
+def test_register_returns_422_for_an_invalid_username(client: TestClient, username: str) -> None:
+    assert register(client, username=username).status_code == 422
+
+
+@pytest.mark.parametrize("username", ["abc", "x" * 20, "Under_Score", "dash-dash", "digits123"])
+def test_register_accepts_a_valid_username(client: TestClient, username: str) -> None:
+    assert register(client, username=username).status_code == 201
+
+
+def test_register_returns_422_without_a_username(client: TestClient) -> None:
+    response = client.post("/auth/register", json={"email": EMAIL, "password": PASSWORD})
+
+    assert response.status_code == 422
+
+
+def test_register_stores_the_username(client: TestClient, session: Session) -> None:
+    register(client, username="ada-the-great")
+
+    row = session.scalars(select(UserRow).where(UserRow.email == EMAIL)).one()
+    assert row.username == "ada-the-great"
+
+
+def test_register_returns_409_for_a_used_username_with_a_detail_different_from_email(
+    client: TestClient,
+) -> None:
+    register(client, email="a@example.com", username="taken")
+
+    username_conflict = register(client, email="b@example.com", username="taken")
+    email_conflict = register(client, email="a@example.com", username="different")
+
+    assert username_conflict.status_code == 409
+    assert email_conflict.status_code == 409
+    assert username_conflict.json()["detail"] != email_conflict.json()["detail"]
+
+
+def test_register_username_comparison_is_case_sensitive(client: TestClient) -> None:
+    register(client, email="a@example.com", username="Alice")
+
+    response = register(client, email="b@example.com", username="alice")
+
+    assert response.status_code == 201
 
 
 # --- login ------------------------------------------------------------------

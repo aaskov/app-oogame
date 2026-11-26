@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from app.modules.auth._internal.dependencies import get_auth_service, get_current_user
-from app.modules.auth._internal.models import EmailTakenError, User
-from app.modules.auth._internal.schemas import Credentials, ErrorOut, UserOut
+from app.modules.auth._internal.models import EmailTakenError, User, UsernameTakenError
+from app.modules.auth._internal.schemas import Credentials, ErrorOut, Registration, UserOut
 from app.modules.auth._internal.service import AuthService
 from app.shared.config import Settings, get_settings
 
@@ -21,11 +21,13 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
     response_model=UserOut,
     responses={409: {"model": ErrorOut}, 422: {}},
 )
-def register(credentials: Credentials, service: ServiceDep) -> User:
+def register(registration: Registration, service: ServiceDep) -> User:
     try:
-        return service.register(credentials.email, credentials.password)
+        return service.register(registration.email, registration.password, registration.username)
     except EmailTakenError:
         raise HTTPException(status_code=409, detail="Email already registered") from None
+    except UsernameTakenError:
+        raise HTTPException(status_code=409, detail="Username already taken") from None
 
 
 @router.post(

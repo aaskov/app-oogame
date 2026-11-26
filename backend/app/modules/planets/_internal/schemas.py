@@ -2,12 +2,15 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic.json_schema import SkipJsonSchema
 
 MAX_AMOUNT = 9007199254740991  # 2^53 - 1, the largest integer JavaScript holds exactly.
 
 Amount = Annotated[int, Field(ge=0, le=MAX_AMOUNT)]
+Username = Annotated[
+    str, StringConstraints(min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_-]+$")
+]
 BuildingKind = Literal[
     "metal_mine",
     "crystal_mine",
@@ -23,11 +26,20 @@ ShipKind = Literal["small_cargo", "light_fighter"]
 TechKind = Literal["energy_technology", "plasma_technology"]
 
 
+class CoordinatesOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    galaxy: int = Field(ge=1)
+    system: int = Field(ge=1)
+    position: int = Field(ge=1, le=15)
+
+
 class PlanetOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     name: str = Field(max_length=40)
+    coordinates: CoordinatesOut
 
 
 class ResourcesOut(BaseModel):
@@ -144,6 +156,31 @@ class ResearchStartOut(BaseModel):
 
     research: ResearchOut
     vault: VaultOut
+
+
+class GalaxyPlanetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str = Field(max_length=40)
+    username: Username
+
+
+class GalaxyPositionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    position: int = Field(ge=1, le=15)
+    # Absent, not null, without a planet at this position (docs/adr/0110, docs/adr/0118).
+    planet: GalaxyPlanetOut | SkipJsonSchema[None] = None
+
+
+class GalaxySystemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    galaxy: int = Field(ge=1)
+    system: int = Field(ge=1)
+    galaxies: int = Field(ge=1)
+    systems_per_galaxy: int = Field(ge=1)
+    positions: list[GalaxyPositionOut]
 
 
 class ErrorOut(BaseModel):
