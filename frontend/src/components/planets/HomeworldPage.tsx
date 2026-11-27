@@ -3,7 +3,11 @@
 import Link from "next/link";
 
 import { usePlanets } from "@/hooks/usePlanets";
-import type { api } from "@/lib/api";
+import type { api, Coordinates } from "@/lib/api";
+
+function coordinatesText({ galaxy, system, position }: Coordinates) {
+  return `[${galaxy}:${system}:${position}]`;
+}
 
 export function HomeworldPage({ client }: { client?: typeof api }) {
   const { planets, loading } = usePlanets(client);
@@ -20,9 +24,10 @@ export function HomeworldPage({ client }: { client?: typeof api }) {
           <li key={planet.id}>
             <Link
               href={`/planets/${planet.id}/buildings`}
-              className="flex min-h-11 items-center rounded border border-border bg-surface px-4 py-3 text-base font-medium"
+              className="flex min-h-11 flex-wrap items-center rounded border border-border bg-surface px-4 py-3 text-base font-medium"
             >
-              {planet.name}
+              {planet.name}{" "}
+              <span className="text-sm font-normal text-muted">{coordinatesText(planet.coordinates)}</span>
             </Link>
           </li>
         ))}

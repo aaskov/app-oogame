@@ -101,6 +101,8 @@ describe("useAuth", () => {
     expect(outcome).toEqual({ ok: false, status: 0 });
   });
 
+  const registration = { ...credentials, username: "ada" };
+
   it("registers and then logs the user in", async () => {
     const { result, seen } = setup({
       "GET /auth/me": { status: 401 },
@@ -111,7 +113,7 @@ describe("useAuth", () => {
 
     let outcome: AuthResult | undefined;
     await act(async () => {
-      outcome = await result.current.register(credentials);
+      outcome = await result.current.register(registration);
     });
 
     expect(outcome).toEqual({ ok: true });
@@ -121,21 +123,25 @@ describe("useAuth", () => {
       "POST /auth/register",
       "POST /auth/login",
     ]);
+    const registerRequest = seen.find((r) => r.url.endsWith("/auth/register"));
+    expect(await registerRequest?.json()).toEqual(registration);
+    const loginRequest = seen.find((r) => r.url.endsWith("/auth/login"));
+    expect(await loginRequest?.json()).toEqual(credentials);
   });
 
   it("does not log in when register fails", async () => {
     const { result, seen } = setup({
       "GET /auth/me": { status: 401 },
-      "POST /auth/register": { status: 409, body: { detail: "Email exists" } },
+      "POST /auth/register": { status: 409, body: { detail: "Username exists" } },
     });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     let outcome: AuthResult | undefined;
     await act(async () => {
-      outcome = await result.current.register(credentials);
+      outcome = await result.current.register(registration);
     });
 
-    expect(outcome).toEqual({ ok: false, status: 409 });
+    expect(outcome).toEqual({ ok: false, status: 409, detail: "Username exists" });
     expect(result.current.user).toBeNull();
     expect(seen.some((r) => r.url.endsWith("/auth/login"))).toBe(false);
   });
